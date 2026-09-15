@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources\Users;
 
+use App\Http\Resources\Concerns\FormatsDateTime;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class UserResource extends JsonResource
 {
+    use FormatsDateTime;
+
     /**
      * @return array<string, mixed>
      */
@@ -18,14 +21,14 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'role' => $this->role?->value,
             'is_active' => $this->is_active,
-            'email_verified_at' => $this->email_verified_at?->toISOString(),
-            'last_login_at' => $this->last_login_at?->toISOString(),
+            'email_verified_at' => $this->dateTime($this->email_verified_at),
+            'last_login_at' => $this->dateTime($this->last_login_at),
             'created_by' => $this->created_by,
             'updated_by' => $this->updated_by,
             'deleted_by' => $this->deleted_by,
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
-            'deleted_at' => $this->deleted_at?->toISOString(),
+            'created_at' => $this->dateTime($this->created_at),
+            'updated_at' => $this->dateTime($this->updated_at),
+            'deleted_at' => $this->dateTime($this->deleted_at),
         ];
     }
 }

@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources\Rooms;
 
+use App\Http\Resources\Concerns\FormatsDateTime;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class RoomBedResource extends JsonResource
 {
+    use FormatsDateTime;
+
     /**
      * @return array<string, mixed>
      */
@@ -18,8 +21,8 @@ class RoomBedResource extends JsonResource
             'bed_type' => $this->bed_type?->value,
             'bed_type_label' => $this->bed_type?->label(),
             'qty' => $this->qty,
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->dateTime($this->created_at),
+            'updated_at' => $this->dateTime($this->updated_at),
         ];
     }
 }

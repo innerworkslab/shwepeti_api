@@ -6,10 +6,14 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use OwenIt\Auditing\Auditable;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
 #[Fillable(['name', 'slug', 'is_active'])]
-class UnitGroup extends Model
+class UnitGroup extends Model implements AuditableContract
 {
+    use Auditable;
+
     protected function casts(): array
     {
         return [

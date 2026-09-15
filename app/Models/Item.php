@@ -10,37 +10,38 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-#[Fillable(['parent_id', 'name', 'slug', 'code', 'description', 'is_active'])]
-class ItemCategory extends Model implements AuditableContract
+#[Fillable(['item_category_id', 'name', 'code', 'sku', 'barcode', 'stock_unit_id', 'description', 'min_stock', 'is_active'])]
+class Item extends Model implements AuditableContract
 {
     use Auditable;
 
     protected function casts(): array
     {
         return [
+            'min_stock' => 'decimal:6',
             'is_active' => 'boolean',
         ];
     }
 
-    public function parent(): BelongsTo
+    public function itemCategory(): BelongsTo
     {
-        return $this->belongsTo(ItemCategory::class, 'parent_id');
+        return $this->belongsTo(ItemCategory::class);
     }
 
-    public function children(): HasMany
+    public function stockUnit(): BelongsTo
     {
-        return $this->hasMany(ItemCategory::class, 'parent_id');
+        return $this->belongsTo(Unit::class, 'stock_unit_id');
     }
 
-    public function items(): HasMany
+    public function unitConversions(): HasMany
     {
-        return $this->hasMany(Item::class);
+        return $this->hasMany(ItemUnitConversion::class);
     }
 
     /**
-     * @param  Builder<ItemCategory>  $query
+     * @param  Builder<Item>  $query
      * @param  array<string, mixed>  $filters
-     * @return Builder<ItemCategory>
+     * @return Builder<Item>
      */
     public function scopeFilter(Builder $query, array $filters): Builder
     {
@@ -49,16 +50,13 @@ class ItemCategory extends Model implements AuditableContract
                 $filters['search'] ?? null,
                 fn (Builder $query, string $search) => $query->where(function (Builder $query) use ($search): void {
                     $query->where('name', 'like', "%{$search}%")
-                        ->orWhere('slug', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%");
+                        ->orWhere('code', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%")
+                        ->orWhere('barcode', 'like', "%{$search}%");
                 }),
             )
-            ->when(
-                array_key_exists('parent_id', $filters),
-                fn (Builder $query) => blank($filters['parent_id'])
-                    ? $query->whereNull('parent_id')
-                    : $query->where('parent_id', $filters['parent_id']),
-            )
+            ->when($filters['item_category_id'] ?? null, fn (Builder $query, mixed $categoryId) => $query->where('item_category_id', $categoryId))
+            ->when($filters['stock_unit_id'] ?? null, fn (Builder $query, mixed $unitId) => $query->where('stock_unit_id', $unitId))
             ->when(
                 array_key_exists('is_active', $filters),
                 fn (Builder $query) => $query->where('is_active', filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN)),

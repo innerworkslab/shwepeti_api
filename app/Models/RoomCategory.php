@@ -7,11 +7,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use OwenIt\Auditing\Auditable;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
 #[Fillable(['name', 'description', 'is_active', 'created_by', 'updated_by', 'deleted_by'])]
-class RoomCategory extends Model
+class RoomCategory extends Model implements AuditableContract
 {
-    use SoftDeletes;
+    use Auditable, SoftDeletes;
 
     protected function casts(): array
     {

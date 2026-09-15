@@ -25,6 +25,8 @@ class InventoryManagementModuleTest extends TestCase
             ->assertJsonPath('data.slug', 'weight')
             ->assertJsonPath('data.is_active', true);
 
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $created->json('data.created_at'));
+
         $unitGroupId = $created->json('data.id');
 
         $this->withHeaders($headers)->postJson('/api/v1/admin/unit-groups', [

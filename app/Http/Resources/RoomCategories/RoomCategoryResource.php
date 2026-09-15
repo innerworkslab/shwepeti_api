@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources\RoomCategories;
 
+use App\Http\Resources\Concerns\FormatsDateTime;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class RoomCategoryResource extends JsonResource
 {
+    use FormatsDateTime;
+
     /**
      * @return array<string, mixed>
      */
@@ -20,9 +23,9 @@ class RoomCategoryResource extends JsonResource
             'created_by' => $this->created_by,
             'updated_by' => $this->updated_by,
             'deleted_by' => $this->deleted_by,
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
-            'deleted_at' => $this->deleted_at?->toISOString(),
+            'created_at' => $this->dateTime($this->created_at),
+            'updated_at' => $this->dateTime($this->updated_at),
+            'deleted_at' => $this->dateTime($this->deleted_at),
         ];
     }
 }

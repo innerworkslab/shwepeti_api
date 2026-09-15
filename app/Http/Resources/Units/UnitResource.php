@@ -2,12 +2,15 @@
 
 namespace App\Http\Resources\Units;
 
+use App\Http\Resources\Concerns\FormatsDateTime;
 use App\Http\Resources\UnitGroups\UnitGroupResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class UnitResource extends JsonResource
 {
+    use FormatsDateTime;
+
     /**
      * @return array<string, mixed>
      */
@@ -21,8 +24,8 @@ class UnitResource extends JsonResource
             'is_base' => $this->is_base,
             'is_active' => $this->is_active,
             'unit_group' => UnitGroupResource::make($this->whenLoaded('unitGroup')),
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->dateTime($this->created_at),
+            'updated_at' => $this->dateTime($this->updated_at),
         ];
     }
 }

@@ -9,7 +9,8 @@
         "php": "^8.3",
         "laravel/framework": "^13.17",
         "laravel/sanctum": "^4.2",
-        "laravel/tinker": "^3.0"
+        "laravel/tinker": "^3.0",
+        "owen-it/laravel-auditing": "^14.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -25,7 +26,8 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/",
-            "Laravel\\Sanctum\\": "vendor/laravel/sanctum/src/"
+            "Laravel\\Sanctum\\": "vendor/laravel/sanctum/src/",
+            "OwenIt\\Auditing\\": "vendor/owen-it/laravel-auditing/src/"
         }
     },
     "autoload-dev": {

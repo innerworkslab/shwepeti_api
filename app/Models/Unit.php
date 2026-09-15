@@ -6,10 +6,15 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use OwenIt\Auditing\Auditable;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
 #[Fillable(['unit_group_id', 'name', 'symbol', 'is_base', 'is_active'])]
-class Unit extends Model
+class Unit extends Model implements AuditableContract
 {
+    use Auditable;
+
     protected function casts(): array
     {
         return [
@@ -21,6 +26,11 @@ class Unit extends Model
     public function unitGroup(): BelongsTo
     {
         return $this->belongsTo(UnitGroup::class);
+    }
+
+    public function stockItems(): HasMany
+    {
+        return $this->hasMany(Item::class, 'stock_unit_id');
     }
 
     /**
