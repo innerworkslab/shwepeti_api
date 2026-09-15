@@ -1,10 +1,10 @@
-# Hotel Management System Project Specification
+# Shwe Peti Backend API Project Specification
 
 ## 1. Project Overview
 
-The Hotel Management System is a backend API application for managing hotel staff users, room categories, and rooms. The system is designed for an internal admin web dashboard and will expose versioned REST APIs secured with Laravel Sanctum authentication.
+Shwe Peti is a Laravel backend API application for managing hotel administration data. The system is designed for an internal admin web dashboard and exposes versioned REST APIs secured with Laravel Sanctum authentication.
 
-The first release focuses on core hotel administration data: internal staff accounts, room category setup, room inventory, room status tracking, audit logs, soft deletes, and activity history.
+The current release focuses on internal staff accounts, room setup, inventory setup, item master data, unit conversions, audit logs, soft deletes where needed, and consistent API responses.
 
 ## 2. Goals
 
@@ -12,8 +12,9 @@ The first release focuses on core hotel administration data: internal staff acco
 - Manage internal staff users and role-based access.
 - Manage room categories with activation control.
 - Manage rooms and their operational statuses.
+- Manage unit groups, units, item categories, items, and item unit conversions.
 - Keep API responses consistent across success, validation, authentication, authorization, and error states.
-- Preserve important operational history with audit logs, soft deletes, and activity history.
+- Preserve important operational history with audit logs.
 - Use API versioning so future dashboard, mobile, or third-party clients can evolve safely.
 
 ## 3. Scope
@@ -28,10 +29,14 @@ The first release focuses on core hotel administration data: internal staff acco
 - Room CRUD.
 - Room bed setup using `RoomBed` records and `RoomBedTypeEnum`.
 - Room status management using `RoomStatusEnum`.
+- Unit group CRUD and active toggle.
+- Unit CRUD and active toggle.
+- Item category CRUD and active toggle.
+- Item CRUD, nested item unit conversion sync, and active toggle.
+- Item unit conversion CRUD and active toggle.
 - Soft delete and restore support where appropriate.
-- Audit logging for create, update, delete, restore, login, and logout events.
-- Activity history for user, room category, and room records.
-- MySQL database support.
+- Audit logging for model create, update, delete, and restore events using `owen-it/laravel-auditing`.
+- MySQL database support for local development, testing, and production.
 - Backend-only Laravel project with no frontend build tooling.
 
 ### Out of Scope for Initial Release
@@ -41,7 +46,7 @@ The first release focuses on core hotel administration data: internal staff acco
 - Reservation/booking workflows.
 - Payment processing.
 - Restaurant ordering.
-- Inventory stock management.
+- Inventory stock transactions.
 - Housekeeping task assignment.
 - Multi-branch hotel support.
 - Mobile app implementation.
@@ -53,6 +58,7 @@ These excluded areas may be added in later API versions or feature phases.
 - Framework: Laravel
 - Authentication: Laravel Sanctum
 - Database: MySQL
+- Auditing: `owen-it/laravel-auditing`
 - API Style: REST JSON API
 - API Versioning: URI-based versioning, for example `/api/v1/...`
 - Backend Type: API-only backend for an admin web dashboard
@@ -70,12 +76,12 @@ The system is currently for internal staff only. The following roles are require
 
 ### Role Intent
 
-- Hotel Administrator: Full administrative access across users, room categories, rooms, audit logs, and system settings.
+- Hotel Administrator: Full administrative access across users, room categories, rooms, inventory setup, items, item conversions, audit logs, and system settings.
 - Front Office Administrator: Manage room availability and day-to-day room status changes.
 - Reservation Administrator: View and update room availability/status related to reservation operations.
 - Restaurant Administrator: Internal role reserved for future restaurant workflows.
 - Customer Service Administrator: View room and category information to support guest service workflows.
-- Inventory Administrator: Internal role reserved for future inventory workflows.
+- Inventory Administrator: Internal role reserved for future inventory stock workflows.
 
 ## 6. Functional Requirements
 
@@ -97,7 +103,7 @@ The system is currently for internal staff only. The following roles are require
 - Hotel Administrators can deactivate users.
 - Hotel Administrators can soft delete users.
 - Soft-deleted users should be restorable by Hotel Administrators.
-- Users should have activity history.
+- User create, update, delete, and restore changes should be audited.
 
 Recommended user fields:
 
@@ -152,6 +158,7 @@ Functional behavior:
 - Authorized users can soft delete room categories.
 - Authorized users can restore soft-deleted room categories.
 - A room category should not be deleted if active rooms depend on it, unless a force policy is intentionally added later.
+- Create and update use one `POST /api/v1/admin/room-categories` endpoint with optional `id`.
 
 ### 6.4 Room Management
 
@@ -217,16 +224,129 @@ Functional behavior:
 - Authorized users can update room status.
 - Authorized users can soft delete rooms.
 - Authorized users can restore soft-deleted rooms.
-- Status changes must be captured in activity history.
+- Status changes must be captured in audit logs.
+- Create and update use one `POST /api/v1/admin/rooms` endpoint with optional `id`.
 
-### 6.5 Audit Logs
+### 6.5 Inventory Setup
 
-The system must record audit logs for important events.
+Inventory setup defines reusable units and item categories.
+
+Unit group fields:
+
+- `id`
+- `name`
+- `slug`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Unit fields:
+
+- `id`
+- `unit_group_id`
+- `name`
+- `symbol`
+- `is_base`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Item category fields:
+
+- `id`
+- `parent_id`
+- `name`
+- `slug`
+- `code`
+- `description`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Functional behavior:
+
+- Unit groups can be listed, searched, created, updated, shown, deleted, and toggled active/inactive.
+- Units can be listed, searched, filtered by unit group, filtered by base unit state, created, updated, shown, deleted, and toggled active/inactive.
+- Item categories can be listed, searched, filtered by parent, created, updated, shown, deleted, and toggled active/inactive.
+- Unit group and item category slugs are generated from `name` when not provided.
+- Item category `code` is normalized to uppercase underscore format.
+- Non-paginated lists for active-capable resources return active records only.
+- Paginated lists use the provided filters and return pagination metadata.
+- Create and update use one `POST` endpoint with optional `id`.
+
+Seeded unit groups and units:
+
+- Weight: `kg`, `g`
+- Volume: `L`, `ml`
+- Quantity: `pcs`, `bottle`, `box`, `pack`, `carton`
+- Length: `m`, `cm`
+
+Seeded item categories:
+
+- Raw Materials: Meat, Seafood, Vegetable, Rice & Grain, Spice, Cooking Oil
+- Beverages: Soft Drink, Water, Juice, Coffee
+- Consumables: Tissue, Takeaway, Packaging, Cleaning
+- Accessories: Room Accessories, Kitchen Accessories, Equipment Accessories
+
+### 6.6 Item Management
+
+Items represent inventory master data.
+
+Required item fields:
+
+- `id`
+- `item_category_id`
+- `name`
+- `code`
+- `sku`
+- `barcode`
+- `stock_unit_id`
+- `description`
+- `min_stock`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Required item unit conversion fields:
+
+- `id`
+- `item_id`
+- `from_unit_id`
+- `to_unit_id`
+- `conversion_factor`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Validation rules:
+
+- `item_category_id` is required and must reference an existing item category.
+- `name` is required and normalized for whitespace.
+- `code` is required and must be unique.
+- `sku` is nullable and must be unique when present.
+- `barcode` is nullable and must be unique when present.
+- `stock_unit_id` is required and must reference an existing unit.
+- `min_stock` is nullable, numeric, and must be greater than or equal to `0`.
+- `is_active` must be boolean when present.
+- `conversion_factor` is required for conversions and must be greater than `0`.
+- `from_unit_id` and `to_unit_id` must be different.
+- A conversion must be unique by `item_id`, `from_unit_id`, and `to_unit_id`.
+
+Functional behavior:
+
+- Items can be listed, searched, filtered by category, filtered by stock unit, created, updated, shown, deleted, and toggled active/inactive.
+- Items can accept nested `item_unit_conversions` in the save payload.
+- When nested `item_unit_conversions` are provided, missing existing conversions for that item are deleted and submitted conversions are updated or created.
+- Item unit conversions can also be managed directly through their own API endpoints.
+- Non-paginated item and conversion lists return active records only.
+- Create and update use one `POST` endpoint with optional `id`.
+
+### 6.7 Audit Logs
+
+The system records audit logs using `owen-it/laravel-auditing`.
 
 Required audited actions:
 
-- User login
-- User logout
 - User created
 - User updated
 - User deactivated
@@ -241,30 +361,97 @@ Required audited actions:
 - Room status changed
 - Room deleted
 - Room restored
+- Unit group created, updated, deleted
+- Unit created, updated, deleted
+- Item category created, updated, deleted
+- Item created, updated, deleted
+- Item unit conversion created, updated, deleted
 
-Recommended audit log fields:
+Audit log fields:
 
 - `id`
-- `actor_id`
-- `actor_role`
-- `action`
+- `user_type`
+- `user_id`
+- `event`
 - `auditable_type`
 - `auditable_id`
 - `old_values`
 - `new_values`
+- `url`
 - `ip_address`
 - `user_agent`
+- `tags`
 - `created_at`
+- `updated_at`
 
-### 6.6 Activity History
+Polymorphic `auditable_type` values must use the enforced morph map aliases:
 
-Activity history should allow administrators to inspect the timeline of changes for an entity.
+- `user`
+- `room_category`
+- `room`
+- `room_bed`
+- `unit_group`
+- `unit`
+- `item_category`
+- `item`
+- `item_unit_conversion`
+
+Audit log table UI should display:
+
+- Date / Time
+- User
+- Event
+- Module
+- Record ID
+- Summary
+- IP Address
+
+Expanded/detail view should display:
+
+- URL
+- User Agent
+- Old Values
+- New Values
+- Tags
+
+Summary examples:
+
+- `Created item: CHICKEN - Chicken`
+- `Updated item: name, min_stock, is_active`
+- `Deleted room: Room 101`
+- `Restored user: front@example.com`
+
+### 6.8 Date and Time Response Format
+
+All resource date-time fields must be serialized in the application timezone, `Asia/Yangon`, using this format:
+
+```text
+YYYY-MM-DD HH:mm:ss
+```
+
+Example:
+
+```text
+2026-09-15 14:47:41
+```
+
+The database date-time values may remain in the configured database/application timezone, but API resources must not return UTC `Z` ISO strings.
+
+### 6.9 Activity History
+
+Activity history is currently represented through audit logs. Separate entity activity endpoints are not implemented yet.
 
 Supported entities:
 
 - Users
 - Room categories
 - Rooms
+- Room beds
+- Unit groups
+- Units
+- Item categories
+- Items
+- Item unit conversions
 
 Activity history must include:
 
@@ -421,23 +608,98 @@ Pagination response should include metadata:
 | `created_at` | timestamp | Laravel default |
 | `updated_at` | timestamp | Laravel default |
 
-### 8.5 Audit Logs Table
+### 8.5 Unit Groups Table
 
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | unsigned big integer | Primary key |
-| `actor_id` | unsigned big integer nullable | Acting user |
-| `actor_role` | string nullable | Actor role at time of action |
-| `action` | string | Event/action name |
-| `auditable_type` | string nullable | Polymorphic model type |
-| `auditable_id` | unsigned big integer nullable | Polymorphic model id |
-| `old_values` | json nullable | Previous values |
-| `new_values` | json nullable | New values |
-| `ip_address` | string nullable | Request IP |
-| `user_agent` | text nullable | Request user agent |
-| `created_at` | timestamp | Event time |
+| `name` | string | Unit group name |
+| `slug` | string | Unique slug |
+| `is_active` | boolean | Defaults to true |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
 
-### 8.6 Relationships
+### 8.6 Units Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `unit_group_id` | unsigned big integer | Foreign key to unit groups |
+| `name` | string | Unit name |
+| `symbol` | string | Unit symbol |
+| `is_base` | boolean | Defaults to false |
+| `is_active` | boolean | Defaults to true |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.7 Item Categories Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `parent_id` | unsigned big integer nullable | Self-referencing parent category |
+| `name` | string | Category name |
+| `slug` | string | Unique slug |
+| `code` | string | Unique code |
+| `description` | text nullable | Optional description |
+| `is_active` | boolean | Defaults to true |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.8 Items Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `item_category_id` | unsigned big integer | Foreign key to item categories |
+| `name` | string | Item name |
+| `code` | string | Unique item code |
+| `sku` | string nullable | Unique when present |
+| `barcode` | string nullable | Unique when present |
+| `stock_unit_id` | unsigned big integer | Foreign key to units |
+| `description` | text nullable | Optional description |
+| `min_stock` | decimal(18, 6) nullable | Minimum stock quantity |
+| `is_active` | boolean | Defaults to true |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.9 Item Unit Conversions Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `item_id` | unsigned big integer | Foreign key to items |
+| `from_unit_id` | unsigned big integer | Source unit |
+| `to_unit_id` | unsigned big integer | Destination unit |
+| `conversion_factor` | decimal(18, 6) | Conversion multiplier |
+| `is_active` | boolean | Defaults to true |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+Unique index:
+
+- `item_id`, `from_unit_id`, `to_unit_id`
+
+### 8.10 Audits Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `user_type` | string nullable | User morph type |
+| `user_id` | unsigned big integer nullable | Acting user id |
+| `event` | string | Audited event |
+| `auditable_type` | string | Morph map alias |
+| `auditable_id` | unsigned big integer | Audited record id |
+| `old_values` | text nullable | JSON previous values |
+| `new_values` | text nullable | JSON new values |
+| `url` | text nullable | Request URL |
+| `ip_address` | string nullable | Request IP |
+| `user_agent` | string nullable | Request user agent |
+| `tags` | string nullable | Audit tags |
+| `created_at` | timestamp | Event time |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.11 Relationships
 
 - User has many created room categories.
 - User has many updated room categories.
@@ -449,8 +711,20 @@ Pagination response should include metadata:
 - Room belongs to room category.
 - Room has many room beds.
 - Room bed belongs to room.
-- Audit log belongs to actor user.
-- Audit log morphs to auditable entity.
+- Unit group has many units.
+- Unit belongs to unit group.
+- Unit has many stock items.
+- Item category belongs to parent item category.
+- Item category has many child item categories.
+- Item category has many items.
+- Item belongs to item category.
+- Item belongs to stock unit.
+- Item has many item unit conversions.
+- Item unit conversion belongs to item.
+- Item unit conversion belongs to from unit.
+- Item unit conversion belongs to to unit.
+- Audit belongs to user.
+- Audit morphs to auditable entity.
 
 ## 9. API Overview
 
@@ -490,10 +764,9 @@ Accept: application/json
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/api/v1/admin/room-categories` | List room categories |
-| `POST` | `/api/v1/admin/room-categories` | Create room category |
-| `GET` | `/api/v1/admin/room-categories/{roomCategory}` | Show room category |
-| `PUT/PATCH` | `/api/v1/admin/room-categories/{roomCategory}` | Update room category |
-| `DELETE` | `/api/v1/admin/room-categories/{roomCategory}` | Soft delete room category |
+| `POST` | `/api/v1/admin/room-categories` | Create or update room category |
+| `GET` | `/api/v1/admin/room-categories/{room_category}` | Show room category |
+| `DELETE` | `/api/v1/admin/room-categories/{room_category}` | Soft delete room category |
 | `POST` | `/api/v1/admin/room-categories/{roomCategory}/toggle-active` | Update room category active state |
 | `POST` | `/api/v1/admin/room-categories/{roomCategory}/restore` | Restore room category |
 
@@ -502,20 +775,79 @@ Accept: application/json
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/api/v1/admin/rooms` | List rooms |
-| `POST` | `/api/v1/admin/rooms` | Create room |
+| `POST` | `/api/v1/admin/rooms` | Create or update room |
 | `GET` | `/api/v1/admin/rooms/{room}` | Show room |
 | `POST` | `/api/v1/admin/rooms/{room}/status` | Update room status |
 | `DELETE` | `/api/v1/admin/rooms/{room}` | Soft delete room |
 | `POST` | `/api/v1/admin/rooms/{room}/restore` | Restore room |
 
-### 9.5 Audit and Activity Endpoints
+### 9.5 Unit Group Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/unit-groups` | List unit groups |
+| `POST` | `/api/v1/admin/unit-groups` | Create or update unit group |
+| `GET` | `/api/v1/admin/unit-groups/{unit_group}` | Show unit group |
+| `DELETE` | `/api/v1/admin/unit-groups/{unit_group}` | Delete unit group |
+| `POST` | `/api/v1/admin/unit-groups/{unitGroup}/toggle-active` | Update unit group active state |
+
+### 9.6 Unit Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/units` | List units |
+| `POST` | `/api/v1/admin/units` | Create or update unit |
+| `GET` | `/api/v1/admin/units/{unit}` | Show unit |
+| `DELETE` | `/api/v1/admin/units/{unit}` | Delete unit |
+| `POST` | `/api/v1/admin/units/{unit}/toggle-active` | Update unit active state |
+
+### 9.7 Item Category Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/item-categories` | List item categories |
+| `POST` | `/api/v1/admin/item-categories` | Create or update item category |
+| `GET` | `/api/v1/admin/item-categories/{item_category}` | Show item category |
+| `DELETE` | `/api/v1/admin/item-categories/{item_category}` | Delete item category |
+| `POST` | `/api/v1/admin/item-categories/{itemCategory}/toggle-active` | Update item category active state |
+
+### 9.8 Item Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/items` | List items |
+| `POST` | `/api/v1/admin/items` | Create or update item |
+| `GET` | `/api/v1/admin/items/{item}` | Show item |
+| `DELETE` | `/api/v1/admin/items/{item}` | Delete item |
+| `POST` | `/api/v1/admin/items/{item}/toggle-active` | Update item active state |
+
+### 9.9 Item Unit Conversion Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/item-unit-conversions` | List item unit conversions |
+| `POST` | `/api/v1/admin/item-unit-conversions` | Create or update item unit conversion |
+| `GET` | `/api/v1/admin/item-unit-conversions/{item_unit_conversion}` | Show item unit conversion |
+| `DELETE` | `/api/v1/admin/item-unit-conversions/{item_unit_conversion}` | Delete item unit conversion |
+| `POST` | `/api/v1/admin/item-unit-conversions/{itemUnitConversion}/toggle-active` | Update conversion active state |
+
+### 9.10 Audit Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/api/v1/admin/audit-logs` | List audit logs |
-| `GET` | `/api/v1/admin/users/{user}/activities` | User activity history |
-| `GET` | `/api/v1/admin/room-categories/{roomCategory}/activities` | Room category activity history |
-| `GET` | `/api/v1/admin/rooms/{room}/activities` | Room activity history |
+| `GET` | `/api/v1/admin/audit-logs/{audit_log}` | Show audit log |
+
+Audit filters:
+
+- `event`
+- `user_id`
+- `auditable_type`
+- `auditable_id`
+- `date_from`
+- `date_to`
+- `page`
+- `per_page`
 
 ## 10. UI Overview
 
@@ -532,17 +864,24 @@ Expected dashboard screens:
 - Room list screen
 - Room create/edit screen
 - Room status update control
+- Unit group list/create/edit screen
+- Unit list/create/edit screen
+- Item category tree/list/create/edit screen
+- Item list/create/edit screen
+- Item unit conversion management inside item form and direct conversion screen
 - Audit log screen
-- Entity activity timeline screen
+- Audit log detail screen
 
 Expected dashboard behaviors:
 
 - Use bearer-token authentication with Sanctum.
 - Show server validation errors next to relevant fields.
-- Use pagination for user, room category, room, and audit log lists.
-- Provide filters for active/inactive categories and room status.
+- Use pagination for user, room category, room, inventory, item, conversion, and audit log lists.
+- Provide filters for active/inactive setup data, item category, stock unit, room category, room status, audit event, audit module, audit record id, and date range.
+- For non-paginated dropdown lists, expect active records only.
 - Confirm destructive actions before delete.
 - Show restore action only to roles with restore permission.
+- Display date/time values as `YYYY-MM-DD HH:mm:ss`.
 
 ## 11. Workflows
 
@@ -553,7 +892,7 @@ Expected dashboard behaviors:
 3. API checks that the user is active.
 4. API issues a Sanctum token.
 5. API records `last_login_at`.
-6. API writes a login audit log.
+6. Updating `last_login_at` is captured by model auditing.
 7. Dashboard stores the token securely and uses it for future requests.
 
 ### 11.2 Create Room Category
@@ -562,7 +901,7 @@ Expected dashboard behaviors:
 2. API trims the name and normalizes repeated spaces.
 3. API validates uniqueness among non-deleted room categories.
 4. API creates the room category.
-5. API records audit log and activity history.
+5. API records audit log.
 6. API returns the created room category using the standard response format.
 
 ### 11.3 Create Room
@@ -576,7 +915,7 @@ Expected dashboard behaviors:
 7. API validates each room bed's `bed_type` through `RoomBedTypeEnum`.
 8. API validates each room bed's `qty` is greater than or equal to `1`.
 9. API creates the room and its room bed records.
-10. API records audit log and activity history.
+10. API records audit log.
 11. API returns the created room using the standard response format.
 
 ### 11.4 Update Room Status
@@ -585,16 +924,25 @@ Expected dashboard behaviors:
 2. API validates the status against `RoomStatusEnum`.
 3. API updates the room status.
 4. API records old status and new status.
-5. API writes audit log and activity history.
+5. API writes audit log.
 6. API returns the updated room.
 
-### 11.5 Soft Delete and Restore
+### 11.5 Create Item with Unit Conversions
+
+1. Authorized user submits item data and optional `item_unit_conversions`.
+2. API validates category, stock unit, unique code, optional unique SKU, optional unique barcode, and minimum stock.
+3. API creates or updates the item in a database transaction.
+4. If conversions are provided, API deletes missing existing conversions and updates or creates submitted conversions.
+5. API records audit logs for changed models.
+6. API returns the item with category, stock unit, and conversions.
+
+### 11.6 Soft Delete and Restore
 
 1. Authorized user requests delete.
 2. API verifies permission.
 3. API stores `deleted_by`.
 4. API soft deletes the record.
-5. API records audit log and activity history.
+5. API records audit log.
 6. Authorized user may later request restore.
 7. API restores the record and records the restore event.
 
@@ -612,14 +960,18 @@ Permissions should be role-based for the initial release. Granular permissions c
 | Manage rooms | Yes | Yes | Limited | No | No | No |
 | View rooms | Yes | Yes | Yes | Yes | Yes | Yes |
 | Update room status | Yes | Yes | Limited | No | No | No |
+| Manage inventory setup | Yes | No | No | No | No | Limited |
+| View inventory setup | Yes | No | No | Yes | No | Yes |
+| Manage items | Yes | No | No | No | No | Yes |
+| View items | Yes | No | No | Yes | No | Yes |
 | View audit logs | Yes | No | No | No | No | No |
-| View activity history | Yes | Yes | Yes | Limited | Yes | Limited |
+| View activity history through audit logs | Yes | No | No | No | No | No |
 | Restore deleted records | Yes | No | No | No | No | No |
 
 Limited permissions:
 
 - Reservation Administrator may update room status only when related to reservation operations, such as `available` to `reserved` or `reserved` to `available`.
-- Restaurant Administrator and Inventory Administrator activity visibility is reserved for future modules and should be restricted in the initial release.
+- Inventory Administrator permissions are reserved for future expansion. Current implemented admin routes are protected by Hotel Administrator role middleware.
 
 ## 13. Architecture
 
@@ -632,51 +984,90 @@ app/
   Enums/
     RoomBedTypeEnum.php
     RoomStatusEnum.php
+    UserRoleEnum.php
   Http/
     Controllers/
       Api/
         V1/
           Admin/
+            AuditLogController.php
             AuthController.php
+            ItemCategoryController.php
+            ItemController.php
+            ItemUnitConversionController.php
             UserController.php
             RoomCategoryController.php
             RoomController.php
-            AuditLogController.php
+            UnitController.php
+            UnitGroupController.php
     Requests/
       Auth/
-      Users/
+      ItemCategories/
+      ItemUnitConversions/
+      Items/
       RoomCategories/
       Rooms/
-    Resources/
+      UnitGroups/
+      Units/
       Users/
-        UserResource.php
+    Resources/
+      AuditLogs/
+        AuditLogResource.php
+      Concerns/
+        FormatsDateTime.php
+      ItemCategories/
+        ItemCategoryResource.php
+      ItemUnitConversions/
+        ItemUnitConversionResource.php
+      Items/
+        ItemResource.php
       RoomCategories/
         RoomCategoryResource.php
       Rooms/
         RoomResource.php
         RoomBedResource.php
-      AuditLogs/
-        AuditLogResource.php
+      UnitGroups/
+        UnitGroupResource.php
+      Units/
+        UnitResource.php
+      Users/
+        UserResource.php
   Models/
-    User.php
+    Item.php
+    ItemCategory.php
+    ItemUnitConversion.php
     RoomCategory.php
     Room.php
     RoomBed.php
-    AuditLog.php
+    Unit.php
+    UnitGroup.php
+    User.php
   Policies/
     UserPolicy.php
     RoomCategoryPolicy.php
     RoomPolicy.php
     AuditLogPolicy.php
   Services/
-    Auth/
-      AuthService.php
-    Users/
-      UserService.php
     AuditLogs/
       AuditLogService.php
-    Activities/
-      ActivityService.php
+    Auth/
+      AuthService.php
+    ItemCategories/
+      ItemCategoryService.php
+    ItemUnitConversions/
+      ItemUnitConversionService.php
+    Items/
+      ItemService.php
+    RoomCategories/
+      RoomCategoryService.php
+    Rooms/
+      RoomService.php
+    UnitGroups/
+      UnitGroupService.php
+    Units/
+      UnitService.php
+    Users/
+      UserService.php
 ```
 
 ### 13.2 API Versioning
@@ -695,19 +1086,22 @@ app/
 
 - Use Form Requests for validation.
 - Normalize room category names and room names before validation.
+- Normalize unit group names, unit names/symbols, item category names/codes, and item names where appropriate.
 - Use unique rules scoped to ignore soft-deleted records.
 - Use enum validation for room bed type and room status.
 - Validate room bed quantity as an integer greater than or equal to `1`.
+- Validate item unit conversions so `from_unit_id` and `to_unit_id` are different.
 
 ### 13.5 API Response Layer
 
 - Use a shared API response helper or response macro.
 - Use Laravel API Resources for entity serialization.
+- Serialize date/time fields as `Y-m-d H:i:s` in `Asia/Yangon`.
 - Handle exceptions consistently through Laravel exception rendering.
 
 ### 13.6 Database
 
-- Use MySQL in production and local development unless a local SQLite setup is intentionally used for tests.
+- Use MySQL in production, local development, and tests.
 - Add indexes for:
   - `users.email`
   - `users.role`
@@ -719,10 +1113,46 @@ app/
   - `room_beds.room_id`
   - `room_beds.bed_type`
   - unique composite index on `room_beds.room_id` and `room_beds.bed_type`
-  - `audit_logs.actor_id`
-  - `audit_logs.auditable_type`
-  - `audit_logs.auditable_id`
-  - `audit_logs.created_at`
+  - `unit_groups.slug`
+  - `unit_groups.is_active`
+  - `units.unit_group_id`
+  - `units.is_base`
+  - `units.is_active`
+  - unique composite indexes on `units.unit_group_id` with `name` and `symbol`
+  - `item_categories.parent_id`
+  - `item_categories.slug`
+  - `item_categories.code`
+  - `item_categories.is_active`
+  - `items.item_category_id`
+  - `items.stock_unit_id`
+  - `items.code`
+  - `items.sku`
+  - `items.barcode`
+  - `items.is_active`
+  - `item_unit_conversions.item_id`
+  - `item_unit_conversions.from_unit_id`
+  - `item_unit_conversions.to_unit_id`
+  - `item_unit_conversions.is_active`
+  - unique composite index on `item_unit_conversions.item_id`, `from_unit_id`, and `to_unit_id`
+  - `audits.user_id`, `audits.user_type`
+  - `audits.auditable_type`, `audits.auditable_id`
+  - `audits.created_at`
+
+### 13.7 Polymorphic Morph Map
+
+Use `Relation::enforceMorphMap()` so polymorphic database values are stable aliases instead of PHP class names.
+
+Required aliases:
+
+- `user`
+- `room_category`
+- `room`
+- `room_bed`
+- `unit_group`
+- `unit`
+- `item_category`
+- `item`
+- `item_unit_conversion`
 
 ## 14. Implementation Milestones
 
@@ -749,7 +1179,7 @@ app/
 - Add user requests, resources, controller, and policy.
 - Implement user CRUD.
 - Implement user deactivate, soft delete, and restore.
-- Add user activity history.
+- Add user audit logging.
 
 ### Milestone 4: Room Categories
 
@@ -757,7 +1187,8 @@ app/
 - Add room category requests, resource, controller, and policy.
 - Implement trim and whitespace normalization.
 - Implement CRUD, soft delete, and restore.
-- Add audit logs and activity history.
+- Add active toggle endpoint.
+- Add audit logging.
 
 ### Milestone 5: Rooms
 
@@ -767,31 +1198,60 @@ app/
 - Add room requests, resource, controller, and policy.
 - Implement room CRUD.
 - Implement room status update endpoint.
-- Add audit logs and activity history for room changes.
+- Add audit logging for room changes.
 
-### Milestone 6: Audit Logs and Activity History
+### Milestone 6: Inventory Setup
 
-- Create audit logs migration and model.
+- Create unit groups migration and model.
+- Create units migration and model.
+- Create item categories migration and model.
+- Seed initial unit groups, units, and item categories.
+- Add requests, resources, controllers, and services.
+- Implement CRUD and active toggle endpoints.
+- Add list filters and active-only non-paginated lists.
+- Add audit logging.
+
+### Milestone 7: Items and Unit Conversions
+
+- Create items migration and model.
+- Create item unit conversions migration and model.
+- Add requests, resources, controllers, and services.
+- Implement item CRUD and active toggle endpoint.
+- Implement nested item unit conversion syncing inside item save.
+- Implement direct item unit conversion CRUD and active toggle endpoint.
+- Add audit logging.
+
+### Milestone 8: Audit Logs
+
+- Install and configure `owen-it/laravel-auditing`.
+- Create package-standard `audits` migration.
+- Enforce morph map aliases for auditable types.
 - Implement `AuditLogService`.
-- Add audit log list endpoint.
-- Add activity timeline endpoints for supported entities.
-- Add filters by actor, entity type, action, and date range.
+- Add audit log list and detail endpoints.
+- Add filters by user, entity type, entity id, event, and date range.
 
-### Milestone 7: Testing and Quality
+### Milestone 9: Testing and Quality
 
 - Add feature tests for authentication.
 - Add feature tests for user permissions.
 - Add feature tests for room category CRUD.
 - Add feature tests for room CRUD and status changes.
+- Add feature tests for inventory setup CRUD and toggles.
+- Add feature tests for item CRUD, nested conversions, and conversion toggles.
 - Add tests for consistent API responses.
 - Add tests for soft delete and restore behavior.
 - Add tests for audit log creation.
+- Add tests for date/time response format.
 
-### Milestone 8: Documentation and Handoff
+### Milestone 10: Documentation and Handoff
 
 - Document environment setup.
 - Document API authentication flow.
 - Document API response format.
+- Document date/time response format.
+- Document inventory setup APIs.
+- Document item and conversion APIs.
+- Document audit log filters and morph aliases.
 - Document role permissions.
 - Provide seed data instructions.
 - Prepare dashboard integration notes.
@@ -804,3 +1264,8 @@ app/
 - Should room status changes require a reason/note for maintenance, cleaning, or inactive states?
 - Should audit logs be immutable forever, or should retention rules be added later?
 - Should the API expose soft-deleted records through `with_trashed` filters for Hotel Administrators?
+- Should item categories allow duplicate child names under different parent categories, or should slug stay globally unique?
+- Should units enforce only one base unit per unit group?
+- Should item unit conversions require `from_unit_id` and `to_unit_id` to belong to the same unit group?
+- Should Inventory Administrator get access to inventory setup and item APIs now, or remain future-reserved?
+- Should stock movements, purchase receiving, and inventory adjustment modules be added after item master data?
