@@ -3,14 +3,20 @@
 use App\Enums\UserRoleEnum;
 use App\Http\Controllers\Api\V1\Admin\AuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AuthController;
+use App\Http\Controllers\Api\V1\Admin\InventoryLedgerController;
+use App\Http\Controllers\Api\V1\Admin\InventoryStockBalanceController;
+use App\Http\Controllers\Api\V1\Admin\InventoryTransferController;
 use App\Http\Controllers\Api\V1\Admin\ItemCategoryController;
 use App\Http\Controllers\Api\V1\Admin\ItemController;
 use App\Http\Controllers\Api\V1\Admin\ItemUnitConversionController;
 use App\Http\Controllers\Api\V1\Admin\RoomCategoryController;
 use App\Http\Controllers\Api\V1\Admin\RoomController;
+use App\Http\Controllers\Api\V1\Admin\StockInController;
+use App\Http\Controllers\Api\V1\Admin\StockOutController;
 use App\Http\Controllers\Api\V1\Admin\UnitController;
 use App\Http\Controllers\Api\V1\Admin\UnitGroupController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
+use App\Http\Controllers\Api\V1\Admin\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/admin')->group(function (): void {
@@ -39,6 +45,16 @@ Route::prefix('v1/admin')->group(function (): void {
             Route::post('items/{item}/toggle-active', [ItemController::class, 'toggleActive']);
             Route::apiResource('item-unit-conversions', ItemUnitConversionController::class)->except(['update', 'delete']);
             Route::post('item-unit-conversions/{itemUnitConversion}/toggle-active', [ItemUnitConversionController::class, 'toggleActive']);
+            Route::apiResource('warehouses', WarehouseController::class)->except(['update', 'delete']);
+            Route::post('warehouses/{warehouse}/toggle-active', [WarehouseController::class, 'toggleActive']);
+            Route::apiResource('stock-ins', StockInController::class)->except(['update', 'delete']);
+            Route::post('stock-ins/{stockIn}/status', [StockInController::class, 'status']);
+            Route::apiResource('stock-outs', StockOutController::class)->except(['update', 'delete']);
+            Route::post('stock-outs/{stockOut}/status', [StockOutController::class, 'status']);
+            Route::apiResource('inventory-transfers', InventoryTransferController::class)->except(['update', 'delete']);
+            Route::post('inventory-transfers/{inventoryTransfer}/status', [InventoryTransferController::class, 'status']);
+            Route::apiResource('inventory-ledgers', InventoryLedgerController::class)->only(['index', 'show']);
+            Route::apiResource('inventory-stock-balances', InventoryStockBalanceController::class)->only(['index', 'show']);
             Route::apiResource('audit-logs', AuditLogController::class)->only(['index', 'show']);
         });
     });
