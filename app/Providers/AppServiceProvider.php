@@ -8,6 +8,7 @@ use App\Models\InventoryTransfer;
 use App\Models\InventoryTransferItem;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\ItemPriceHistory;
 use App\Models\ItemUnitConversion;
 use App\Models\Menu;
 use App\Models\MenuCategory;
@@ -50,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
             'unit' => Unit::class,
             'item_category' => ItemCategory::class,
             'item' => Item::class,
+            'item_price_history' => ItemPriceHistory::class,
             'item_unit_conversion' => ItemUnitConversion::class,
             'menu_category' => MenuCategory::class,
             'menu' => Menu::class,

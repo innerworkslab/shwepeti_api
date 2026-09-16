@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-#[Fillable(['item_category_id', 'name', 'code', 'sku', 'barcode', 'stock_unit_id', 'description', 'min_stock', 'is_active'])]
+#[Fillable(['item_category_id', 'name', 'code', 'sku', 'barcode', 'stock_unit_id', 'description', 'min_stock', 'price', 'is_active'])]
 class Item extends Model implements AuditableContract
 {
     use Auditable;
@@ -19,6 +19,7 @@ class Item extends Model implements AuditableContract
     {
         return [
             'min_stock' => 'decimal:6',
+            'price' => 'decimal:2',
             'is_active' => 'boolean',
         ];
     }
@@ -41,6 +42,11 @@ class Item extends Model implements AuditableContract
     public function stockBalances(): HasMany
     {
         return $this->hasMany(InventoryStockBalance::class);
+    }
+
+    public function priceHistories(): HasMany
+    {
+        return $this->hasMany(ItemPriceHistory::class);
     }
 
     /**

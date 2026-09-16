@@ -21,6 +21,7 @@ class ItemSeeder extends Seeder
                 'stock_unit' => 'kg',
                 'description' => 'Chicken raw material stock.',
                 'min_stock' => 10,
+                'price' => 12000,
                 'conversions' => [
                     ['from' => 'kg', 'to' => 'g', 'factor' => 1000],
                 ],
@@ -33,6 +34,7 @@ class ItemSeeder extends Seeder
                 'stock_unit' => 'kg',
                 'description' => 'Rice and grain stock.',
                 'min_stock' => 25,
+                'price' => 2500,
                 'conversions' => [
                     ['from' => 'kg', 'to' => 'g', 'factor' => 1000],
                     ['from' => 'box', 'to' => 'kg', 'factor' => 25],
@@ -46,6 +48,7 @@ class ItemSeeder extends Seeder
                 'stock_unit' => 'L',
                 'description' => 'Cooking oil stock.',
                 'min_stock' => 10,
+                'price' => 8000,
                 'conversions' => [
                     ['from' => 'L', 'to' => 'ml', 'factor' => 1000],
                     ['from' => 'carton', 'to' => 'L', 'factor' => 12],
@@ -59,6 +62,7 @@ class ItemSeeder extends Seeder
                 'stock_unit' => 'bottle',
                 'description' => 'Soft drink bottle stock.',
                 'min_stock' => 24,
+                'price' => 900,
                 'conversions' => [
                     ['from' => 'carton', 'to' => 'bottle', 'factor' => 24],
                 ],
@@ -71,6 +75,7 @@ class ItemSeeder extends Seeder
                 'stock_unit' => 'bottle',
                 'description' => 'Drinking water bottle stock.',
                 'min_stock' => 48,
+                'price' => 500,
                 'conversions' => [
                     ['from' => 'carton', 'to' => 'bottle', 'factor' => 24],
                 ],
@@ -83,6 +88,7 @@ class ItemSeeder extends Seeder
                 'stock_unit' => 'pack',
                 'description' => 'Tissue pack stock.',
                 'min_stock' => 20,
+                'price' => 1000,
                 'conversions' => [
                     ['from' => 'carton', 'to' => 'pack', 'factor' => 50],
                 ],
@@ -95,6 +101,7 @@ class ItemSeeder extends Seeder
                 'stock_unit' => 'bottle',
                 'description' => 'Cleaning detergent bottle stock.',
                 'min_stock' => 10,
+                'price' => 3500,
                 'conversions' => [
                     ['from' => 'carton', 'to' => 'bottle', 'factor' => 12],
                 ],
@@ -107,6 +114,7 @@ class ItemSeeder extends Seeder
                 'stock_unit' => 'pcs',
                 'description' => 'Room guest toothbrush stock.',
                 'min_stock' => 100,
+                'price' => 300,
                 'conversions' => [
                     ['from' => 'pack', 'to' => 'pcs', 'factor' => 12],
                     ['from' => 'box', 'to' => 'pcs', 'factor' => 144],
@@ -125,6 +133,7 @@ class ItemSeeder extends Seeder
                 'stock_unit_id' => $this->unitId($itemData['stock_unit']),
                 'description' => $itemData['description'],
                 'min_stock' => $itemData['min_stock'],
+                'price' => $itemData['price'],
                 'is_active' => true,
             ]);
 
@@ -138,6 +147,14 @@ class ItemSeeder extends Seeder
                     'is_active' => true,
                 ]);
             }
+
+            $item->priceHistories()->updateOrCreate([
+                'old_price' => null,
+            ], [
+                'new_price' => $itemData['price'],
+                'changed_at' => now(),
+                'changed_by' => null,
+            ]);
         }
     }
 

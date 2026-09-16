@@ -25,6 +25,7 @@ class ItemManagementModuleTest extends TestCase
             'stock_unit_id' => $setup['kg_id'],
             'description' => 'Raw chicken stock',
             'min_stock' => 10.5,
+            'price' => 12000,
             'is_active' => true,
             'item_unit_conversions' => [
                 [
@@ -46,6 +47,7 @@ class ItemManagementModuleTest extends TestCase
             ->assertJsonPath('data.name', 'Chicken')
             ->assertJsonPath('data.code', 'CHICKEN')
             ->assertJsonPath('data.stock_unit_id', $setup['kg_id'])
+            ->assertJsonPath('data.price', '12000.00')
             ->assertJsonCount(2, 'data.item_unit_conversions');
 
         $itemId = $created->json('data.id');
@@ -57,6 +59,7 @@ class ItemManagementModuleTest extends TestCase
             'code' => 'CHICKEN',
             'stock_unit_id' => $setup['kg_id'],
             'min_stock' => 15,
+            'price' => 12500,
             'is_active' => false,
             'item_unit_conversions' => [
                 [
@@ -69,7 +72,25 @@ class ItemManagementModuleTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('data.name', 'Chicken Updated')
             ->assertJsonPath('data.is_active', false)
+            ->assertJsonPath('data.price', '12500.00')
             ->assertJsonCount(1, 'data.item_unit_conversions');
+
+        $this->withHeaders($headers)->postJson('/api/v1/admin/items/price', [
+            'item_id' => $itemId,
+            'price' => 13000,
+        ])->assertOk()
+            ->assertJsonPath('data.id', $itemId)
+            ->assertJsonPath('data.price', '13000.00');
+
+        $this->withHeaders($headers)->getJson("/api/v1/admin/items/{$itemId}/price-histories")
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.old_price', '12500.00')
+            ->assertJsonPath('data.0.new_price', '13000.00')
+            ->assertJsonPath('data.1.old_price', '12000.00')
+            ->assertJsonPath('data.1.new_price', '12500.00')
+            ->assertJsonPath('data.2.old_price', null)
+            ->assertJsonPath('data.2.new_price', '12000.00');
 
         $this->assertDatabaseMissing('item_unit_conversions', [
             'item_id' => $itemId,

@@ -42,6 +42,7 @@ class SaveItemRequest extends FormRequest
             'stock_unit_id' => ['required', 'integer', 'exists:units,id'],
             'description' => ['nullable', 'string'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
+            'price' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
             'item_unit_conversions' => ['sometimes', 'array'],
             'item_unit_conversions.*.id' => ['nullable', 'integer', 'exists:item_unit_conversions,id'],

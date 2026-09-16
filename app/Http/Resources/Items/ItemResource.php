@@ -28,6 +28,7 @@ class ItemResource extends JsonResource
             'stock_unit_id' => $this->stock_unit_id,
             'description' => $this->description,
             'min_stock' => $this->min_stock,
+            'price' => $this->price,
             'is_active' => $this->is_active,
             'item_category' => ItemCategoryResource::make($this->whenLoaded('itemCategory')),
             'stock_unit' => UnitResource::make($this->whenLoaded('stockUnit')),

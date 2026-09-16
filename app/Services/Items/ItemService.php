@@ -4,6 +4,7 @@ namespace App\Services\Items;
 
 use App\Http\Resources\Items\ItemResource;
 use App\Models\Item;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -41,9 +42,13 @@ class ItemService
         return $query->paginate((int) ($filters['per_page'] ?? 15));
     }
 
-    public function save(array $data): ItemResource
+    public function save(array $data, ?User $actor = null): ItemResource
     {
-        return DB::transaction(function () use ($data): ItemResource {
+        return DB::transaction(function () use ($data, $actor): ItemResource {
+            $existingItem = filled($data['id'] ?? null)
+                ? Item::query()->whereKey($data['id'])->lockForUpdate()->firstOrFail()
+                : null;
+
             $item = Item::query()->updateOrCreate(['id' => $data['id'] ?? null], [
                 'item_category_id' => $data['item_category_id'],
                 'name' => $data['name'],
@@ -53,8 +58,13 @@ class ItemService
                 'stock_unit_id' => $data['stock_unit_id'],
                 'description' => $data['description'] ?? null,
                 'min_stock' => $data['min_stock'] ?? null,
+                'price' => array_key_exists('price', $data) ? $data['price'] : $existingItem?->price,
                 'is_active' => $data['is_active'] ?? true,
             ]);
+
+            if (array_key_exists('price', $data)) {
+                $this->recordPriceHistory($item, $existingItem?->price, $data['price'], $actor);
+            }
 
             if (isset($data['item_unit_conversions'])) {
                 $this->syncUnitConversions($item, $data['item_unit_conversions']);
@@ -69,6 +79,62 @@ class ItemService
 
             return new ItemResource($item);
         });
+    }
+
+    public function updatePrice(int $itemId, mixed $price, ?User $actor = null): ItemResource
+    {
+        return DB::transaction(function () use ($itemId, $price, $actor): ItemResource {
+            $item = Item::query()->whereKey($itemId)->lockForUpdate()->firstOrFail();
+            $oldPrice = $item->price;
+            $newPrice = number_format((float) $price, 2, '.', '');
+
+            if ($this->pricesAreDifferent($oldPrice, $newPrice)) {
+                $item->update(['price' => $newPrice]);
+
+                $item->priceHistories()->create([
+                    'old_price' => $oldPrice === null ? null : number_format((float) $oldPrice, 2, '.', ''),
+                    'new_price' => $newPrice,
+                    'changed_at' => now(),
+                    'changed_by' => $actor?->id,
+                ]);
+            }
+
+            $item = $item->refresh()->load([
+                'itemCategory',
+                'stockUnit',
+                'unitConversions.fromUnit',
+                'unitConversions.toUnit',
+            ]);
+
+            return new ItemResource($item);
+        });
+    }
+
+    private function pricesAreDifferent(mixed $oldPrice, string $newPrice): bool
+    {
+        $oldPrice = $oldPrice === null ? null : number_format((float) $oldPrice, 2, '.', '');
+
+        return $oldPrice !== $newPrice;
+    }
+
+    private function recordPriceHistory(Item $item, mixed $oldPrice, mixed $newPrice, ?User $actor = null): void
+    {
+        if ($newPrice === null) {
+            return;
+        }
+
+        $newPrice = number_format((float) $newPrice, 2, '.', '');
+
+        if (! $this->pricesAreDifferent($oldPrice, $newPrice)) {
+            return;
+        }
+
+        $item->priceHistories()->create([
+            'old_price' => $oldPrice === null ? null : number_format((float) $oldPrice, 2, '.', ''),
+            'new_price' => $newPrice,
+            'changed_at' => now(),
+            'changed_by' => $actor?->id,
+        ]);
     }
 
     public function delete(Item $item): void

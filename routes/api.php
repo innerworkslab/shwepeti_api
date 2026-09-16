@@ -45,7 +45,9 @@ Route::prefix('v1/admin')->group(function (): void {
             Route::apiResource('item-categories', ItemCategoryController::class)->except(['update', 'delete']);
             Route::post('item-categories/{itemCategory}/toggle-active', [ItemCategoryController::class, 'toggleActive']);
             Route::apiResource('items', ItemController::class)->except(['update', 'delete']);
+            Route::post('items/price', [ItemController::class, 'updatePrice']);
             Route::post('items/{item}/toggle-active', [ItemController::class, 'toggleActive']);
+            Route::get('items/{item}/price-histories', [ItemController::class, 'priceHistories']);
             Route::apiResource('item-unit-conversions', ItemUnitConversionController::class)->except(['update', 'delete']);
             Route::post('item-unit-conversions/{itemUnitConversion}/toggle-active', [ItemUnitConversionController::class, 'toggleActive']);
             Route::apiResource('menu-categories', MenuCategoryController::class)->except(['update', 'delete']);
