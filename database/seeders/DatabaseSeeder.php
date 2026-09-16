@@ -29,6 +29,8 @@ class DatabaseSeeder extends Seeder
             UnitSeeder::class,
             ItemCategorySeeder::class,
             ItemSeeder::class,
+            MenuCategorySeeder::class,
+            MenuSeeder::class,
             WarehouseSeeder::class,
         ]);
     }

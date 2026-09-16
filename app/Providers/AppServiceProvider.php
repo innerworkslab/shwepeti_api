@@ -9,6 +9,9 @@ use App\Models\InventoryTransferItem;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\ItemUnitConversion;
+use App\Models\Menu;
+use App\Models\MenuCategory;
+use App\Models\MenuRecipe;
 use App\Models\Room;
 use App\Models\RoomBed;
 use App\Models\RoomCategory;
@@ -48,6 +51,9 @@ class AppServiceProvider extends ServiceProvider
             'item_category' => ItemCategory::class,
             'item' => Item::class,
             'item_unit_conversion' => ItemUnitConversion::class,
+            'menu_category' => MenuCategory::class,
+            'menu' => Menu::class,
+            'menu_recipe' => MenuRecipe::class,
             'warehouse' => Warehouse::class,
             'stock_in' => StockIn::class,
             'stock_in_item' => StockInItem::class,
