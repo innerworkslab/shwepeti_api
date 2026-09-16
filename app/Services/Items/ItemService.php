@@ -24,6 +24,23 @@ class ItemService
         return $query->paginate((int) ($filters['per_page'] ?? 15));
     }
 
+    public function byWarehouse(int $warehouseId, array $filters = []): LengthAwarePaginator|Collection
+    {
+        $query = Item::query()
+            ->with(['itemCategory', 'stockUnit', 'unitConversions.fromUnit', 'unitConversions.toUnit'])
+            ->withSum([
+                'stockBalances as balance_quantity' => fn ($query) => $query->where('warehouse_id', $warehouseId),
+            ], 'quantity')
+            ->filter($filters)
+            ->latest();
+
+        if (! isset($filters['page'])) {
+            return $query->where('is_active', true)->get();
+        }
+
+        return $query->paginate((int) ($filters['per_page'] ?? 15));
+    }
+
     public function save(array $data): ItemResource
     {
         return DB::transaction(function () use ($data): ItemResource {
@@ -43,12 +60,14 @@ class ItemService
                 $this->syncUnitConversions($item, $data['item_unit_conversions']);
             }
 
-            return new ItemResource($item->refresh()->load([
+            $item = $item->refresh()->load([
                 'itemCategory',
                 'stockUnit',
                 'unitConversions.fromUnit',
                 'unitConversions.toUnit',
-            ]));
+            ]);
+
+            return new ItemResource($item);
         });
     }
 
@@ -62,12 +81,14 @@ class ItemService
         return DB::transaction(function () use ($item, $isActive): ItemResource {
             $item->update(['is_active' => $isActive]);
 
-            return new ItemResource($item->refresh()->load([
+            $item = $item->refresh()->load([
                 'itemCategory',
                 'stockUnit',
                 'unitConversions.fromUnit',
                 'unitConversions.toUnit',
-            ]));
+            ]);
+
+            return new ItemResource($item);
         });
     }
 

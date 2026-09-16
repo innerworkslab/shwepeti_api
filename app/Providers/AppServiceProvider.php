@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\InventoryAdjustment;
+use App\Models\InventoryAdjustmentItem;
 use App\Models\InventoryTransfer;
 use App\Models\InventoryTransferItem;
 use App\Models\Item;
@@ -53,6 +55,8 @@ class AppServiceProvider extends ServiceProvider
             'stock_out_item' => StockOutItem::class,
             'inventory_transfer' => InventoryTransfer::class,
             'inventory_transfer_item' => InventoryTransferItem::class,
+            'inventory_adjustment' => InventoryAdjustment::class,
+            'inventory_adjustment_item' => InventoryAdjustmentItem::class,
         ]);
     }
 }

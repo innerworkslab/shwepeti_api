@@ -68,10 +68,6 @@ class InventoryDocumentService
 
     public function lineBatchNo(array $line, string $transactionDate, ?Model $existingLine = null): ?string
     {
-        if (filled($line['batch_no'] ?? null)) {
-            return $line['batch_no'];
-        }
-
         if ($existingLine && filled($existingLine->batch_no)) {
             return $existingLine->batch_no;
         }

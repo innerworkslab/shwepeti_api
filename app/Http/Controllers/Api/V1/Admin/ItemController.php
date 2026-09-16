@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Items\SaveItemRequest;
 use App\Http\Requests\Items\ToggleItemActiveRequest;
 use App\Http\Resources\Items\ItemResource;
+use App\Http\Resources\Items\ItemWarehouseBalanceResource;
 use App\Models\Item;
+use App\Models\Warehouse;
 use App\Services\Items\ItemService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +36,19 @@ class ItemController extends Controller
             'Item saved successfully.',
             $item,
             status: filled($request->input('id')) ? 200 : 201,
+        );
+    }
+
+    public function byWarehouse(Request $request, Warehouse $warehouse): JsonResponse
+    {
+        $items = $this->itemService->byWarehouse(
+            $warehouse->id,
+            $request->only(['search', 'item_category_id', 'stock_unit_id', 'is_active', 'page', 'per_page']),
+        );
+
+        return ApiResponse::resource(
+            'Warehouse items retrieved successfully.',
+            ItemWarehouseBalanceResource::collection($items),
         );
     }
 

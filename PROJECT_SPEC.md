@@ -4,7 +4,7 @@
 
 Shwe Peti is a Laravel backend API application for managing hotel administration data. The system is designed for an internal admin web dashboard and exposes versioned REST APIs secured with Laravel Sanctum authentication.
 
-The current release focuses on internal staff accounts, room setup, inventory setup, item master data, unit conversions, audit logs, soft deletes where needed, and consistent API responses.
+The current release focuses on internal staff accounts, room setup, inventory setup, item master data, unit conversions, inventory stock movements, audit logs, soft deletes where needed, and consistent API responses.
 
 ## 2. Goals
 
@@ -13,6 +13,8 @@ The current release focuses on internal staff accounts, room setup, inventory se
 - Manage room categories with activation control.
 - Manage rooms and their operational statuses.
 - Manage unit groups, units, item categories, items, and item unit conversions.
+- Manage warehouses and inventory stock transactions.
+- Maintain inventory ledgers and stock balances from posted stock documents.
 - Keep API responses consistent across success, validation, authentication, authorization, and error states.
 - Preserve important operational history with audit logs.
 - Use API versioning so future dashboard, mobile, or third-party clients can evolve safely.
@@ -34,6 +36,11 @@ The current release focuses on internal staff accounts, room setup, inventory se
 - Item category CRUD and active toggle.
 - Item CRUD, nested item unit conversion sync, and active toggle.
 - Item unit conversion CRUD and active toggle.
+- Warehouse CRUD and active toggle.
+- Stock in, stock out, inventory transfer, and inventory adjustment documents.
+- Draft, posted, and cancelled status workflows for inventory documents.
+- Inventory ledger retrieval and stock balance retrieval.
+- Warehouse-specific item list with stock balance quantity and stock unit.
 - Soft delete and restore support where appropriate.
 - Audit logging for model create, update, delete, and restore events using `owen-it/laravel-auditing`.
 - MySQL database support for local development, testing, and production.
@@ -46,7 +53,6 @@ The current release focuses on internal staff accounts, room setup, inventory se
 - Reservation/booking workflows.
 - Payment processing.
 - Restaurant ordering.
-- Inventory stock transactions.
 - Housekeeping task assignment.
 - Multi-branch hotel support.
 - Mobile app implementation.
@@ -81,7 +87,7 @@ The system is currently for internal staff only. The following roles are require
 - Reservation Administrator: View and update room availability/status related to reservation operations.
 - Restaurant Administrator: Internal role reserved for future restaurant workflows.
 - Customer Service Administrator: View room and category information to support guest service workflows.
-- Inventory Administrator: Internal role reserved for future inventory stock workflows.
+- Inventory Administrator: Manage inventory setup, item master data, stock documents, stock balances, and ledgers where permitted.
 
 ## 6. Functional Requirements
 
@@ -340,8 +346,222 @@ Functional behavior:
 - Item unit conversions can also be managed directly through their own API endpoints.
 - Non-paginated item and conversion lists return active records only.
 - Create and update use one `POST` endpoint with optional `id`.
+- Normal item list and item detail responses do not include stock balance fields.
+- Warehouse-specific item lists include `balance_quantity` and a `balance` object with the item's stock unit.
 
-### 6.7 Audit Logs
+### 6.7 Inventory Transactions
+
+Inventory transactions are represented by draft documents that become stock-affecting only when their status changes to `posted`.
+
+Inventory document statuses:
+
+- `draft`
+- `posted`
+- `cancelled`
+
+Adjustment types:
+
+- `increase`
+- `decrease`
+
+Warehouse fields:
+
+- `id`
+- `code`
+- `name`
+- `description`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Stock in fields:
+
+- `id`
+- `reference_no`
+- `warehouse_id`
+- `transaction_date`
+- `status`
+- `remark`
+- `created_by`
+- `created_at`
+- `updated_at`
+
+Stock in item fields:
+
+- `id`
+- `stock_in_id`
+- `item_id`
+- `unit_id`
+- `quantity`
+- `base_quantity`
+- `unit_cost`
+- `total_cost`
+- `batch_no`
+- `expiry_date`
+- `remark`
+- `created_at`
+- `updated_at`
+
+Stock out fields:
+
+- `id`
+- `reference_no`
+- `warehouse_id`
+- `transaction_date`
+- `status`
+- `reason`
+- `remark`
+- `created_by`
+- `created_at`
+- `updated_at`
+
+Stock out item fields:
+
+- `id`
+- `stock_out_id`
+- `item_id`
+- `unit_id`
+- `quantity`
+- `base_quantity`
+- `unit_cost`
+- `total_cost`
+- `batch_no`
+- `remark`
+- `created_at`
+- `updated_at`
+
+Inventory transfer fields:
+
+- `id`
+- `reference_no`
+- `from_warehouse_id`
+- `to_warehouse_id`
+- `transaction_date`
+- `status`
+- `remark`
+- `created_by`
+- `created_at`
+- `updated_at`
+
+Inventory transfer item fields:
+
+- `id`
+- `inventory_transfer_id`
+- `item_id`
+- `unit_id`
+- `quantity`
+- `base_quantity`
+- `batch_no`
+- `expiry_date`
+- `remark`
+- `created_at`
+- `updated_at`
+
+Inventory adjustment fields:
+
+- `id`
+- `reference_no`
+- `warehouse_id`
+- `transaction_date`
+- `status`
+- `reason`
+- `remark`
+- `created_by`
+- `created_at`
+- `updated_at`
+
+Inventory adjustment item fields:
+
+- `id`
+- `inventory_adjustment_id`
+- `item_id`
+- `unit_id`
+- `system_quantity`
+- `physical_quantity`
+- `adjustment_type`
+- `adjustment_quantity`
+- `base_quantity`
+- `batch_no`
+- `expiry_date`
+- `remark`
+- `created_at`
+- `updated_at`
+
+Functional behavior:
+
+- Inventory save APIs create or update draft documents only.
+- New inventory documents default to `draft`.
+- Draft documents can change status to `posted` or `cancelled`.
+- Posted and cancelled documents cannot change status again.
+- Only draft documents can be edited or deleted.
+- `reference_no` is generated by the backend when not provided.
+- `batch_no` is generated by the backend for new document lines and preserved when existing lines are updated.
+- `base_quantity` is calculated by the backend using the item's stock unit and item unit conversions.
+- Clients must not provide `batch_no`, `base_quantity`, adjustment type, or adjustment quantity as source-of-truth values.
+- Posting stock in adds stock balance and writes `in` ledger rows.
+- Posting stock out subtracts stock balance and writes `out` ledger rows.
+- Posting transfers subtracts from the source warehouse and adds to the destination warehouse.
+- Transfer ledger rows use `transfer_out` and `transfer_in`.
+- Posting adjustments applies increase or decrease movements based on physical count differences.
+- Adjustment ledger rows use `adjustment_increase` and `adjustment_decrease`.
+- Decrease operations must fail with validation errors when stock is insufficient.
+- Inventory ledgers are read-only through API endpoints.
+- Inventory stock balances are read-only through API endpoints.
+
+Inventory ledger fields:
+
+- `id`
+- `item_id`
+- `warehouse_id`
+- `transaction_type`
+- `reference_type`
+- `reference_id`
+- `quantity`
+- `unit_id`
+- `base_quantity`
+- `unit_cost`
+- `total_cost`
+- `batch_no`
+- `expiry_date`
+- `balance_quantity`
+- `transaction_date`
+- `remark`
+- `created_by`
+- `created_at`
+- `updated_at`
+
+Inventory stock balance fields:
+
+- `id`
+- `item_id`
+- `warehouse_id`
+- `quantity`
+- `reserved_quantity`
+- `available_quantity`
+- `created_at`
+- `updated_at`
+
+Warehouse-specific item list response:
+
+```json
+{
+  "id": 1,
+  "name": "Chicken",
+  "stock_unit_id": 1,
+  "balance_quantity": "7.000000",
+  "balance": {
+    "quantity": "7.000000",
+    "unit_id": 1,
+    "unit": {
+      "id": 1,
+      "name": "kg",
+      "symbol": "kg"
+    }
+  }
+}
+```
+
+### 6.8 Audit Logs
 
 The system records audit logs using `owen-it/laravel-auditing`.
 
@@ -366,6 +586,11 @@ Required audited actions:
 - Item category created, updated, deleted
 - Item created, updated, deleted
 - Item unit conversion created, updated, deleted
+- Warehouse created, updated, deleted
+- Stock in created, updated, deleted
+- Stock out created, updated, deleted
+- Inventory transfer created, updated, deleted
+- Inventory adjustment created, updated, deleted
 
 Audit log fields:
 
@@ -395,6 +620,15 @@ Polymorphic `auditable_type` values must use the enforced morph map aliases:
 - `item_category`
 - `item`
 - `item_unit_conversion`
+- `warehouse`
+- `stock_in`
+- `stock_in_item`
+- `stock_out`
+- `stock_out_item`
+- `inventory_transfer`
+- `inventory_transfer_item`
+- `inventory_adjustment`
+- `inventory_adjustment_item`
 
 Audit log table UI should display:
 
@@ -421,7 +655,7 @@ Summary examples:
 - `Deleted room: Room 101`
 - `Restored user: front@example.com`
 
-### 6.8 Date and Time Response Format
+### 6.9 Date and Time Response Format
 
 All resource date-time fields must be serialized in the application timezone, `Asia/Yangon`, using this format:
 
@@ -437,7 +671,7 @@ Example:
 
 The database date-time values may remain in the configured database/application timezone, but API resources must not return UTC `Z` ISO strings.
 
-### 6.9 Activity History
+### 6.10 Activity History
 
 Activity history is currently represented through audit logs. Separate entity activity endpoints are not implemented yet.
 
@@ -452,6 +686,10 @@ Supported entities:
 - Item categories
 - Items
 - Item unit conversions
+- Warehouses
+- Stock documents
+- Inventory transfers
+- Inventory adjustments
 
 Activity history must include:
 
@@ -680,7 +918,198 @@ Unique index:
 
 - `item_id`, `from_unit_id`, `to_unit_id`
 
-### 8.10 Audits Table
+### 8.10 Warehouses Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `code` | string | Unique warehouse code |
+| `name` | string | Warehouse name |
+| `description` | text nullable | Optional description |
+| `is_active` | boolean | Defaults to true |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.11 Stock Ins Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `reference_no` | string | Unique, generated by backend |
+| `warehouse_id` | unsigned big integer | Receiving warehouse |
+| `transaction_date` | dateTime | Transaction date and time |
+| `status` | string | `draft`, `posted`, or `cancelled` |
+| `remark` | text nullable | Optional remark |
+| `created_by` | unsigned big integer nullable | User who created record |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.12 Stock In Items Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `stock_in_id` | unsigned big integer | Foreign key to stock ins |
+| `item_id` | unsigned big integer | Foreign key to items |
+| `unit_id` | unsigned big integer | Input unit |
+| `quantity` | decimal(18, 6) | Input quantity |
+| `base_quantity` | decimal(18, 6) | Calculated in item stock unit |
+| `unit_cost` | decimal(18, 6) nullable | Optional cost |
+| `total_cost` | decimal(18, 6) nullable | Optional total cost |
+| `batch_no` | string nullable | Generated by backend |
+| `expiry_date` | date nullable | Optional expiry date |
+| `remark` | text nullable | Optional remark |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.13 Stock Outs Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `reference_no` | string | Unique, generated by backend |
+| `warehouse_id` | unsigned big integer | Source warehouse |
+| `transaction_date` | dateTime | Transaction date and time |
+| `status` | string | `draft`, `posted`, or `cancelled` |
+| `reason` | string nullable | Optional reason |
+| `remark` | text nullable | Optional remark |
+| `created_by` | unsigned big integer nullable | User who created record |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.14 Stock Out Items Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `stock_out_id` | unsigned big integer | Foreign key to stock outs |
+| `item_id` | unsigned big integer | Foreign key to items |
+| `unit_id` | unsigned big integer | Input unit |
+| `quantity` | decimal(18, 6) | Input quantity |
+| `base_quantity` | decimal(18, 6) | Calculated in item stock unit |
+| `unit_cost` | decimal(18, 6) nullable | Optional cost |
+| `total_cost` | decimal(18, 6) nullable | Optional total cost |
+| `batch_no` | string nullable | Generated by backend |
+| `remark` | text nullable | Optional remark |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.15 Inventory Transfers Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `reference_no` | string | Unique, generated by backend |
+| `from_warehouse_id` | unsigned big integer | Source warehouse |
+| `to_warehouse_id` | unsigned big integer | Destination warehouse |
+| `transaction_date` | dateTime | Transaction date and time |
+| `status` | string | `draft`, `posted`, or `cancelled` |
+| `remark` | text nullable | Optional remark |
+| `created_by` | unsigned big integer nullable | User who created record |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.16 Inventory Transfer Items Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `inventory_transfer_id` | unsigned big integer | Foreign key to inventory transfers |
+| `item_id` | unsigned big integer | Foreign key to items |
+| `unit_id` | unsigned big integer | Input unit |
+| `quantity` | decimal(18, 6) | Input quantity |
+| `base_quantity` | decimal(18, 6) | Calculated in item stock unit |
+| `batch_no` | string nullable | Generated by backend |
+| `expiry_date` | date nullable | Optional expiry date |
+| `remark` | text nullable | Optional remark |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.17 Inventory Adjustments Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `reference_no` | string | Unique, generated by backend |
+| `warehouse_id` | unsigned big integer | Warehouse being adjusted |
+| `transaction_date` | dateTime | Transaction date and time |
+| `status` | string | `draft`, `posted`, or `cancelled` |
+| `reason` | string nullable | Optional reason |
+| `remark` | text nullable | Optional remark |
+| `created_by` | unsigned big integer nullable | User who created record |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.18 Inventory Adjustment Items Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `inventory_adjustment_id` | unsigned big integer | Foreign key to inventory adjustments |
+| `item_id` | unsigned big integer | Foreign key to items |
+| `unit_id` | unsigned big integer | Count unit |
+| `system_quantity` | decimal(18, 6) | System stock before adjustment |
+| `physical_quantity` | decimal(18, 6) | Actual physical count |
+| `adjustment_type` | string | `increase` or `decrease`, calculated by backend |
+| `adjustment_quantity` | decimal(18, 6) | Absolute difference, calculated by backend |
+| `base_quantity` | decimal(18, 6) | Signed base quantity in item stock unit |
+| `batch_no` | string nullable | Generated by backend |
+| `expiry_date` | date nullable | Optional expiry date |
+| `remark` | text nullable | Optional remark |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.19 Inventory Ledgers Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `item_id` | unsigned big integer | Foreign key to items |
+| `warehouse_id` | unsigned big integer | Foreign key to warehouses |
+| `transaction_type` | string | Movement type |
+| `reference_type` | string nullable | Morph map alias |
+| `reference_id` | unsigned big integer nullable | Source document id |
+| `quantity` | decimal(18, 6) | Input movement quantity |
+| `unit_id` | unsigned big integer | Input unit |
+| `base_quantity` | decimal(18, 6) | Signed stock-unit movement |
+| `unit_cost` | decimal(18, 6) nullable | Optional cost |
+| `total_cost` | decimal(18, 6) nullable | Optional total cost |
+| `batch_no` | string nullable | Batch number |
+| `expiry_date` | date nullable | Optional expiry date |
+| `balance_quantity` | decimal(18, 6) | Running balance after movement |
+| `transaction_date` | dateTime | Transaction date and time |
+| `remark` | text nullable | Optional remark |
+| `created_by` | unsigned big integer nullable | User who posted movement |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+Ledger transaction types:
+
+- `in`
+- `out`
+- `transfer_out`
+- `transfer_in`
+- `adjustment_increase`
+- `adjustment_decrease`
+
+### 8.20 Inventory Stock Balances Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `item_id` | unsigned big integer | Foreign key to items |
+| `warehouse_id` | unsigned big integer | Foreign key to warehouses |
+| `quantity` | decimal(18, 6) | On-hand stock quantity |
+| `reserved_quantity` | decimal(18, 6) | Reserved stock quantity |
+| `available_quantity` | decimal(18, 6) | Available stock quantity |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+Unique index:
+
+- `item_id`, `warehouse_id`
+
+### 8.21 Audits Table
 
 | Column | Type | Notes |
 | --- | --- | --- |
@@ -699,7 +1128,7 @@ Unique index:
 | `created_at` | timestamp | Event time |
 | `updated_at` | timestamp | Laravel default |
 
-### 8.11 Relationships
+### 8.22 Relationships
 
 - User has many created room categories.
 - User has many updated room categories.
@@ -720,9 +1149,17 @@ Unique index:
 - Item belongs to item category.
 - Item belongs to stock unit.
 - Item has many item unit conversions.
+- Item has many inventory stock balances.
 - Item unit conversion belongs to item.
 - Item unit conversion belongs to from unit.
 - Item unit conversion belongs to to unit.
+- Warehouse has many stock documents and stock balances.
+- Stock in belongs to warehouse and has many stock in items.
+- Stock out belongs to warehouse and has many stock out items.
+- Inventory transfer belongs to source and destination warehouses and has many transfer items.
+- Inventory adjustment belongs to warehouse and has many adjustment items.
+- Inventory ledger belongs to item, warehouse, unit, and creator.
+- Inventory stock balance belongs to item and warehouse.
 - Audit belongs to user.
 - Audit morphs to auditable entity.
 
@@ -820,6 +1257,7 @@ Accept: application/json
 | `GET` | `/api/v1/admin/items/{item}` | Show item |
 | `DELETE` | `/api/v1/admin/items/{item}` | Delete item |
 | `POST` | `/api/v1/admin/items/{item}/toggle-active` | Update item active state |
+| `GET` | `/api/v1/admin/warehouses/{warehouse}/items` | List items with balance for a warehouse |
 
 ### 9.9 Item Unit Conversion Endpoints
 
@@ -831,7 +1269,91 @@ Accept: application/json
 | `DELETE` | `/api/v1/admin/item-unit-conversions/{item_unit_conversion}` | Delete item unit conversion |
 | `POST` | `/api/v1/admin/item-unit-conversions/{itemUnitConversion}/toggle-active` | Update conversion active state |
 
-### 9.10 Audit Endpoints
+### 9.10 Warehouse Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/warehouses` | List warehouses |
+| `POST` | `/api/v1/admin/warehouses` | Create or update warehouse |
+| `GET` | `/api/v1/admin/warehouses/{warehouse}` | Show warehouse |
+| `DELETE` | `/api/v1/admin/warehouses/{warehouse}` | Delete warehouse |
+| `POST` | `/api/v1/admin/warehouses/{warehouse}/toggle-active` | Update warehouse active state |
+
+### 9.11 Stock In Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/stock-ins` | List stock in documents |
+| `POST` | `/api/v1/admin/stock-ins` | Create or update draft stock in |
+| `GET` | `/api/v1/admin/stock-ins/{stock_in}` | Show stock in |
+| `DELETE` | `/api/v1/admin/stock-ins/{stock_in}` | Delete draft stock in |
+| `POST` | `/api/v1/admin/stock-ins/{stockIn}/status` | Change draft stock in to posted or cancelled |
+
+### 9.12 Stock Out Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/stock-outs` | List stock out documents |
+| `POST` | `/api/v1/admin/stock-outs` | Create or update draft stock out |
+| `GET` | `/api/v1/admin/stock-outs/{stock_out}` | Show stock out |
+| `DELETE` | `/api/v1/admin/stock-outs/{stock_out}` | Delete draft stock out |
+| `POST` | `/api/v1/admin/stock-outs/{stockOut}/status` | Change draft stock out to posted or cancelled |
+
+### 9.13 Inventory Transfer Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/inventory-transfers` | List inventory transfers |
+| `POST` | `/api/v1/admin/inventory-transfers` | Create or update draft transfer |
+| `GET` | `/api/v1/admin/inventory-transfers/{inventory_transfer}` | Show transfer |
+| `DELETE` | `/api/v1/admin/inventory-transfers/{inventory_transfer}` | Delete draft transfer |
+| `POST` | `/api/v1/admin/inventory-transfers/{inventoryTransfer}/status` | Change draft transfer to posted or cancelled |
+
+### 9.14 Inventory Adjustment Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/inventory-adjustments` | List inventory adjustments |
+| `POST` | `/api/v1/admin/inventory-adjustments` | Create or update draft adjustment |
+| `GET` | `/api/v1/admin/inventory-adjustments/{inventory_adjustment}` | Show adjustment |
+| `DELETE` | `/api/v1/admin/inventory-adjustments/{inventory_adjustment}` | Delete draft adjustment |
+| `POST` | `/api/v1/admin/inventory-adjustments/{inventoryAdjustment}/status` | Change draft adjustment to posted or cancelled |
+
+### 9.15 Inventory Ledger Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/inventory-ledgers` | List inventory ledger movements |
+| `GET` | `/api/v1/admin/inventory-ledgers/{inventory_ledger}` | Show inventory ledger movement |
+
+Ledger filters:
+
+- `item_id`
+- `warehouse_id`
+- `transaction_type`
+- `reference_type`
+- `reference_id`
+- `batch_no`
+- `date_from`
+- `date_to`
+- `page`
+- `per_page`
+
+### 9.16 Inventory Stock Balance Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/inventory-stock-balances` | List stock balances |
+| `GET` | `/api/v1/admin/inventory-stock-balances/{inventory_stock_balance}` | Show stock balance |
+
+Stock balance filters:
+
+- `item_id`
+- `warehouse_id`
+- `page`
+- `per_page`
+
+### 9.17 Audit Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -869,6 +1391,14 @@ Expected dashboard screens:
 - Item category tree/list/create/edit screen
 - Item list/create/edit screen
 - Item unit conversion management inside item form and direct conversion screen
+- Warehouse list/create/edit screen
+- Stock in list/create/edit/status screen
+- Stock out list/create/edit/status screen
+- Inventory transfer list/create/edit/status screen
+- Inventory adjustment list/create/edit/status screen
+- Inventory ledger screen
+- Inventory stock balance screen
+- Warehouse item balance screen
 - Audit log screen
 - Audit log detail screen
 
@@ -876,12 +1406,13 @@ Expected dashboard behaviors:
 
 - Use bearer-token authentication with Sanctum.
 - Show server validation errors next to relevant fields.
-- Use pagination for user, room category, room, inventory, item, conversion, and audit log lists.
+- Use pagination for user, room category, room, inventory, item, conversion, transaction, ledger, balance, and audit log lists.
 - Provide filters for active/inactive setup data, item category, stock unit, room category, room status, audit event, audit module, audit record id, and date range.
 - For non-paginated dropdown lists, expect active records only.
 - Confirm destructive actions before delete.
 - Show restore action only to roles with restore permission.
 - Display date/time values as `YYYY-MM-DD HH:mm:ss`.
+- Do not ask users to enter backend-generated fields such as `reference_no`, `batch_no`, `base_quantity`, `adjustment_type`, or `adjustment_quantity` unless an approved override is intentionally added later.
 
 ## 11. Workflows
 
@@ -936,7 +1467,61 @@ Expected dashboard behaviors:
 5. API records audit logs for changed models.
 6. API returns the item with category, stock unit, and conversions.
 
-### 11.6 Soft Delete and Restore
+### 11.6 Post Stock In
+
+1. Authorized user creates a stock in document through `POST /api/v1/admin/stock-ins`.
+2. API creates the document as `draft`.
+3. API generates `reference_no` when missing.
+4. API calculates each line's `base_quantity`.
+5. API generates each new line's `batch_no`.
+6. Authorized user posts the document through `POST /api/v1/admin/stock-ins/{stockIn}/status` with `status = posted`.
+7. API adds stock balance per item and warehouse.
+8. API writes `in` ledger rows.
+9. API changes document status to `posted`.
+
+### 11.7 Post Stock Out
+
+1. Authorized user creates a stock out document through `POST /api/v1/admin/stock-outs`.
+2. API creates the document as `draft`.
+3. API generates `reference_no`, line `batch_no`, and line `base_quantity`.
+4. Authorized user posts the document through the status endpoint.
+5. API validates sufficient stock.
+6. API subtracts stock balance per item and warehouse.
+7. API writes `out` ledger rows.
+8. API changes document status to `posted`.
+
+### 11.8 Post Inventory Transfer
+
+1. Authorized user creates an inventory transfer document.
+2. API validates source and destination warehouses are different.
+3. API creates the document as `draft`.
+4. API generates `reference_no`, line `batch_no`, and line `base_quantity`.
+5. Authorized user posts the transfer through the status endpoint.
+6. API validates sufficient stock in the source warehouse.
+7. API subtracts stock from the source warehouse and writes `transfer_out` ledger rows.
+8. API adds stock to the destination warehouse and writes `transfer_in` ledger rows.
+9. API changes transfer status to `posted`.
+
+### 11.9 Post Inventory Adjustment
+
+1. Authorized user creates an inventory adjustment document.
+2. API creates the document as `draft`.
+3. API generates `reference_no` and line `batch_no`.
+4. API calculates `adjustment_type`, `adjustment_quantity`, and signed `base_quantity` from `system_quantity` and `physical_quantity`.
+5. Authorized user posts the adjustment through the status endpoint.
+6. API adds stock for increases or subtracts stock for decreases.
+7. API writes `adjustment_increase` or `adjustment_decrease` ledger rows.
+8. API changes adjustment status to `posted`.
+
+### 11.10 Cancel Inventory Document
+
+1. Authorized user creates an inventory document as `draft`.
+2. Authorized user sends a status update with `status = cancelled`.
+3. API validates the document is still draft.
+4. API changes status to `cancelled`.
+5. API does not write inventory ledger rows or change stock balances.
+
+### 11.11 Soft Delete and Restore
 
 1. Authorized user requests delete.
 2. API verifies permission.
@@ -964,6 +1549,11 @@ Permissions should be role-based for the initial release. Granular permissions c
 | View inventory setup | Yes | No | No | Yes | No | Yes |
 | Manage items | Yes | No | No | No | No | Yes |
 | View items | Yes | No | No | Yes | No | Yes |
+| Manage warehouses | Yes | No | No | No | No | Yes |
+| View warehouses | Yes | No | No | Yes | No | Yes |
+| Manage stock documents | Yes | No | No | No | No | Yes |
+| View inventory ledgers | Yes | No | No | No | No | Yes |
+| View stock balances | Yes | No | No | No | No | Yes |
 | View audit logs | Yes | No | No | No | No | No |
 | View activity history through audit logs | Yes | No | No | No | No | No |
 | Restore deleted records | Yes | No | No | No | No | No |
@@ -971,7 +1561,7 @@ Permissions should be role-based for the initial release. Granular permissions c
 Limited permissions:
 
 - Reservation Administrator may update room status only when related to reservation operations, such as `available` to `reserved` or `reserved` to `available`.
-- Inventory Administrator permissions are reserved for future expansion. Current implemented admin routes are protected by Hotel Administrator role middleware.
+- Current implemented admin routes are protected by Hotel Administrator role middleware. Inventory Administrator access may be opened later with route-level permission changes.
 
 ## 13. Architecture
 
@@ -982,8 +1572,13 @@ Recommended Laravel structure:
 ```text
 app/
   Enums/
+    AdjustmentStatusEnum.php
+    AdjustmentTypeEnum.php
     RoomBedTypeEnum.php
     RoomStatusEnum.php
+    StockInStatusEnum.php
+    StockOutStatusEnum.php
+    TransferStatusEnum.php
     UserRoleEnum.php
   Http/
     Controllers/
@@ -992,56 +1587,98 @@ app/
           Admin/
             AuditLogController.php
             AuthController.php
+            InventoryAdjustmentController.php
+            InventoryLedgerController.php
+            InventoryStockBalanceController.php
+            InventoryTransferController.php
             ItemCategoryController.php
             ItemController.php
             ItemUnitConversionController.php
-            UserController.php
             RoomCategoryController.php
             RoomController.php
+            StockInController.php
+            StockOutController.php
             UnitController.php
             UnitGroupController.php
+            UserController.php
+            WarehouseController.php
     Requests/
       Auth/
+      InventoryAdjustments/
+      InventoryTransfers/
       ItemCategories/
       ItemUnitConversions/
       Items/
       RoomCategories/
       Rooms/
+      StockIns/
+      StockOuts/
       UnitGroups/
       Units/
       Users/
+      Warehouses/
     Resources/
       AuditLogs/
         AuditLogResource.php
       Concerns/
         FormatsDateTime.php
+      InventoryAdjustments/
+        InventoryAdjustmentResource.php
+        InventoryAdjustmentItemResource.php
+      InventoryLedgers/
+        InventoryLedgerResource.php
+      InventoryStockBalances/
+        InventoryStockBalanceResource.php
+      InventoryTransfers/
+        InventoryTransferResource.php
+        InventoryTransferItemResource.php
       ItemCategories/
         ItemCategoryResource.php
       ItemUnitConversions/
         ItemUnitConversionResource.php
       Items/
         ItemResource.php
+        ItemWarehouseBalanceResource.php
       RoomCategories/
         RoomCategoryResource.php
       Rooms/
         RoomResource.php
         RoomBedResource.php
+      StockIns/
+        StockInResource.php
+        StockInItemResource.php
+      StockOuts/
+        StockOutResource.php
+        StockOutItemResource.php
       UnitGroups/
         UnitGroupResource.php
       Units/
         UnitResource.php
       Users/
         UserResource.php
+      Warehouses/
+        WarehouseResource.php
   Models/
+    InventoryAdjustment.php
+    InventoryAdjustmentItem.php
+    InventoryLedger.php
+    InventoryStockBalance.php
+    InventoryTransfer.php
+    InventoryTransferItem.php
     Item.php
     ItemCategory.php
     ItemUnitConversion.php
     RoomCategory.php
     Room.php
     RoomBed.php
+    StockIn.php
+    StockInItem.php
+    StockOut.php
+    StockOutItem.php
     Unit.php
     UnitGroup.php
     User.php
+    Warehouse.php
   Policies/
     UserPolicy.php
     RoomCategoryPolicy.php
@@ -1052,6 +1689,16 @@ app/
       AuditLogService.php
     Auth/
       AuthService.php
+    Inventory/
+      InventoryDocumentService.php
+    InventoryAdjustments/
+      InventoryAdjustmentService.php
+    InventoryLedgers/
+      InventoryLedgerService.php
+    InventoryStockBalances/
+      InventoryStockBalanceService.php
+    InventoryTransfers/
+      InventoryTransferService.php
     ItemCategories/
       ItemCategoryService.php
     ItemUnitConversions/
@@ -1062,12 +1709,18 @@ app/
       RoomCategoryService.php
     Rooms/
       RoomService.php
+    StockIns/
+      StockInService.php
+    StockOuts/
+      StockOutService.php
     UnitGroups/
       UnitGroupService.php
     Units/
       UnitService.php
     Users/
       UserService.php
+    Warehouses/
+      WarehouseService.php
 ```
 
 ### 13.2 API Versioning
@@ -1091,6 +1744,11 @@ app/
 - Use enum validation for room bed type and room status.
 - Validate room bed quantity as an integer greater than or equal to `1`.
 - Validate item unit conversions so `from_unit_id` and `to_unit_id` are different.
+- Validate inventory document statuses through their enums.
+- Validate inventory adjustment status through `AdjustmentStatusEnum`.
+- Validate calculated adjustment types through `AdjustmentTypeEnum`.
+- Validate stock movement quantities as positive values.
+- Validate stock decreases against available stock during posting.
 
 ### 13.5 API Response Layer
 
@@ -1134,6 +1792,26 @@ app/
   - `item_unit_conversions.to_unit_id`
   - `item_unit_conversions.is_active`
   - unique composite index on `item_unit_conversions.item_id`, `from_unit_id`, and `to_unit_id`
+  - `warehouses.code`
+  - `warehouses.is_active`
+  - `stock_ins.reference_no`
+  - `stock_ins.warehouse_id`
+  - `stock_ins.status`
+  - `stock_outs.reference_no`
+  - `stock_outs.warehouse_id`
+  - `stock_outs.status`
+  - `inventory_transfers.reference_no`
+  - `inventory_transfers.from_warehouse_id`
+  - `inventory_transfers.to_warehouse_id`
+  - `inventory_transfers.status`
+  - `inventory_adjustments.reference_no`
+  - `inventory_adjustments.warehouse_id`
+  - `inventory_adjustments.status`
+  - `inventory_ledgers.item_id`, `inventory_ledgers.warehouse_id`
+  - `inventory_ledgers.reference_type`, `inventory_ledgers.reference_id`
+  - `inventory_ledgers.transaction_date`
+  - `inventory_ledgers.batch_no`
+  - unique composite index on `inventory_stock_balances.item_id` and `warehouse_id`
   - `audits.user_id`, `audits.user_type`
   - `audits.auditable_type`, `audits.auditable_id`
   - `audits.created_at`
@@ -1153,6 +1831,15 @@ Required aliases:
 - `item_category`
 - `item`
 - `item_unit_conversion`
+- `warehouse`
+- `stock_in`
+- `stock_in_item`
+- `stock_out`
+- `stock_out_item`
+- `inventory_transfer`
+- `inventory_transfer_item`
+- `inventory_adjustment`
+- `inventory_adjustment_item`
 
 ## 14. Implementation Milestones
 
@@ -1230,7 +1917,20 @@ Required aliases:
 - Add audit log list and detail endpoints.
 - Add filters by user, entity type, entity id, event, and date range.
 
-### Milestone 9: Testing and Quality
+### Milestone 9: Inventory Transactions
+
+- Create warehouse migration, model, request, resource, controller, and service.
+- Create stock in and stock out migrations, models, requests, resources, controllers, and services.
+- Create inventory transfer migrations, models, requests, resources, controller, and service.
+- Create inventory adjustment migrations, models, requests, resources, controller, and service.
+- Create inventory ledger and stock balance migrations, models, resources, controllers, and services.
+- Implement backend-generated `reference_no` and `batch_no`.
+- Implement backend-calculated `base_quantity`, adjustment type, and adjustment quantity.
+- Implement draft, posted, and cancelled status workflows.
+- Implement posting actions that update stock balances and write inventory ledgers.
+- Add warehouse-specific item balance list.
+
+### Milestone 10: Testing and Quality
 
 - Add feature tests for authentication.
 - Add feature tests for user permissions.
@@ -1238,12 +1938,18 @@ Required aliases:
 - Add feature tests for room CRUD and status changes.
 - Add feature tests for inventory setup CRUD and toggles.
 - Add feature tests for item CRUD, nested conversions, and conversion toggles.
+- Add feature tests for warehouse CRUD and active toggles.
+- Add feature tests for stock in/out posting and cancellation.
+- Add feature tests for inventory transfer posting and cancellation.
+- Add feature tests for inventory adjustment posting and cancellation.
+- Add tests for inventory ledger and stock balance responses.
+- Add tests for backend-generated reference numbers, batch numbers, and base quantities.
 - Add tests for consistent API responses.
 - Add tests for soft delete and restore behavior.
 - Add tests for audit log creation.
 - Add tests for date/time response format.
 
-### Milestone 10: Documentation and Handoff
+### Milestone 11: Documentation and Handoff
 
 - Document environment setup.
 - Document API authentication flow.
@@ -1251,6 +1957,9 @@ Required aliases:
 - Document date/time response format.
 - Document inventory setup APIs.
 - Document item and conversion APIs.
+- Document warehouse and inventory transaction APIs.
+- Document inventory posting behavior and ledger transaction types.
+- Document backend-generated fields.
 - Document audit log filters and morph aliases.
 - Document role permissions.
 - Provide seed data instructions.
@@ -1267,5 +1976,6 @@ Required aliases:
 - Should item categories allow duplicate child names under different parent categories, or should slug stay globally unique?
 - Should units enforce only one base unit per unit group?
 - Should item unit conversions require `from_unit_id` and `to_unit_id` to belong to the same unit group?
-- Should Inventory Administrator get access to inventory setup and item APIs now, or remain future-reserved?
-- Should stock movements, purchase receiving, and inventory adjustment modules be added after item master data?
+- Should Inventory Administrator get access to inventory transaction APIs now, or remain behind Hotel Administrator middleware until granular permissions are added?
+- Should inventory stock out and transfer support FIFO/FEFO batch selection rules later?
+- Should cancelled posted stock documents be reversible through a formal reversal document instead of status changes?

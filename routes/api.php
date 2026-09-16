@@ -3,6 +3,7 @@
 use App\Enums\UserRoleEnum;
 use App\Http\Controllers\Api\V1\Admin\AuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AuthController;
+use App\Http\Controllers\Api\V1\Admin\InventoryAdjustmentController;
 use App\Http\Controllers\Api\V1\Admin\InventoryLedgerController;
 use App\Http\Controllers\Api\V1\Admin\InventoryStockBalanceController;
 use App\Http\Controllers\Api\V1\Admin\InventoryTransferController;
@@ -46,6 +47,7 @@ Route::prefix('v1/admin')->group(function (): void {
             Route::apiResource('item-unit-conversions', ItemUnitConversionController::class)->except(['update', 'delete']);
             Route::post('item-unit-conversions/{itemUnitConversion}/toggle-active', [ItemUnitConversionController::class, 'toggleActive']);
             Route::apiResource('warehouses', WarehouseController::class)->except(['update', 'delete']);
+            Route::get('warehouses/{warehouse}/items', [ItemController::class, 'byWarehouse']);
             Route::post('warehouses/{warehouse}/toggle-active', [WarehouseController::class, 'toggleActive']);
             Route::apiResource('stock-ins', StockInController::class)->except(['update', 'delete']);
             Route::post('stock-ins/{stockIn}/status', [StockInController::class, 'status']);
@@ -53,6 +55,8 @@ Route::prefix('v1/admin')->group(function (): void {
             Route::post('stock-outs/{stockOut}/status', [StockOutController::class, 'status']);
             Route::apiResource('inventory-transfers', InventoryTransferController::class)->except(['update', 'delete']);
             Route::post('inventory-transfers/{inventoryTransfer}/status', [InventoryTransferController::class, 'status']);
+            Route::apiResource('inventory-adjustments', InventoryAdjustmentController::class)->except(['update', 'delete']);
+            Route::post('inventory-adjustments/{inventoryAdjustment}/status', [InventoryAdjustmentController::class, 'status']);
             Route::apiResource('inventory-ledgers', InventoryLedgerController::class)->only(['index', 'show']);
             Route::apiResource('inventory-stock-balances', InventoryStockBalanceController::class)->only(['index', 'show']);
             Route::apiResource('audit-logs', AuditLogController::class)->only(['index', 'show']);

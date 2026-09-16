@@ -38,6 +38,11 @@ class Item extends Model implements AuditableContract
         return $this->hasMany(ItemUnitConversion::class);
     }
 
+    public function stockBalances(): HasMany
+    {
+        return $this->hasMany(InventoryStockBalance::class);
+    }
+
     /**
      * @param  Builder<Item>  $query
      * @param  array<string, mixed>  $filters

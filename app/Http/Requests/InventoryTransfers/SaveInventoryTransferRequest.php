@@ -27,7 +27,6 @@ class SaveInventoryTransferRequest extends FormRequest
             'items.*.unit_id' => ['required', 'integer', 'exists:units,id'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.base_quantity' => ['nullable', 'numeric', 'gt:0'],
-            'items.*.batch_no' => ['nullable', 'string', 'max:255'],
             'items.*.expiry_date' => ['nullable', 'date'],
             'items.*.remark' => ['nullable', 'string'],
         ];

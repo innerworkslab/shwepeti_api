@@ -28,7 +28,6 @@ class SaveStockInRequest extends FormRequest
             'items.*.base_quantity' => ['nullable', 'numeric', 'gt:0'],
             'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'items.*.total_cost' => ['nullable', 'numeric', 'min:0'],
-            'items.*.batch_no' => ['nullable', 'string', 'max:255'],
             'items.*.expiry_date' => ['nullable', 'date'],
             'items.*.remark' => ['nullable', 'string'],
         ];

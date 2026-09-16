@@ -2,6 +2,7 @@
 
 namespace App\Services\InventoryLedgers;
 
+use App\Models\InventoryAdjustment;
 use App\Models\InventoryLedger;
 use App\Models\InventoryStockBalance;
 use App\Models\InventoryTransfer;
@@ -167,6 +168,49 @@ class InventoryLedgerService
                     'balance_quantity' => $this->decimal($toQuantity),
                     'transaction_date' => $transfer->transaction_date,
                     'remark' => $line->remark ?? $transfer->remark,
+                    'created_by' => $actor?->id,
+                ]);
+            }
+        });
+    }
+
+    public function postAdjustment(InventoryAdjustment $adjustment, ?User $actor = null): void
+    {
+        DB::transaction(function () use ($adjustment, $actor): void {
+            $adjustment->loadMissing('items');
+
+            foreach ($adjustment->items as $line) {
+                $balance = $this->balance($line->item_id, $adjustment->warehouse_id);
+                $baseQuantity = (float) $line->base_quantity;
+                $newQuantity = (float) $balance->quantity + $baseQuantity;
+
+                if ($newQuantity < 0) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Insufficient stock for item {$line->item_id} in warehouse {$adjustment->warehouse_id}."],
+                    ]);
+                }
+
+                $balance->update([
+                    'quantity' => $this->decimal($newQuantity),
+                    'available_quantity' => $this->decimal($newQuantity - (float) $balance->reserved_quantity),
+                ]);
+
+                InventoryLedger::query()->create([
+                    'item_id' => $line->item_id,
+                    'warehouse_id' => $adjustment->warehouse_id,
+                    'transaction_type' => 'adjustment_'.$line->adjustment_type->value,
+                    'reference_type' => $adjustment->getMorphClass(),
+                    'reference_id' => $adjustment->id,
+                    'quantity' => $line->adjustment_quantity,
+                    'unit_id' => $line->unit_id,
+                    'base_quantity' => $line->base_quantity,
+                    'unit_cost' => null,
+                    'total_cost' => null,
+                    'batch_no' => $line->batch_no,
+                    'expiry_date' => $line->expiry_date,
+                    'balance_quantity' => $this->decimal($newQuantity),
+                    'transaction_date' => $adjustment->transaction_date,
+                    'remark' => $line->remark ?? $adjustment->remark,
                     'created_by' => $actor?->id,
                 ]);
             }
