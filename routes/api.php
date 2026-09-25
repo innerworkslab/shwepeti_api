@@ -3,6 +3,8 @@
 use App\Enums\UserRoleEnum;
 use App\Http\Controllers\Api\V1\Admin\AuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AuthController;
+use App\Http\Controllers\Api\V1\Admin\CashbookController;
+use App\Http\Controllers\Api\V1\Admin\CashbookTransactionController;
 use App\Http\Controllers\Api\V1\Admin\InventoryAdjustmentController;
 use App\Http\Controllers\Api\V1\Admin\InventoryLedgerController;
 use App\Http\Controllers\Api\V1\Admin\InventoryStockBalanceController;
@@ -69,6 +71,9 @@ Route::prefix('v1/admin')->group(function (): void {
             Route::apiResource('inventory-ledgers', InventoryLedgerController::class)->only(['index', 'show']);
             Route::apiResource('inventory-stock-balances', InventoryStockBalanceController::class)->only(['index', 'show']);
             Route::apiResource('audit-logs', AuditLogController::class)->only(['index', 'show']);
+            Route::apiResource('cashbooks', CashbookController::class)->except(['update']);
+            Route::post('cashbooks/{cashbook}/toggle-active', [CashbookController::class, 'toggleActive']);
+            Route::apiResource('cashbook-transactions', CashbookTransactionController::class)->only(['index', 'store', 'show']);
         });
     });
 });

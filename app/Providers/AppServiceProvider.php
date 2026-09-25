@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Cashbook;
+use App\Models\CashbookTransaction;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryAdjustmentItem;
 use App\Models\InventoryTransfer;
@@ -44,6 +46,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Relation::enforceMorphMap([
             'user' => User::class,
+            'cashbook' => Cashbook::class,
+            'cashbook_transaction' => CashbookTransaction::class,
             'room_category' => RoomCategory::class,
             'room' => Room::class,
             'room_bed' => RoomBed::class,
