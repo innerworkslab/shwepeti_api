@@ -8,6 +8,7 @@ use App\Models\StockIn;
 use App\Models\User;
 use App\Services\Inventory\InventoryDocumentService;
 use App\Services\InventoryLedgers\InventoryLedgerService;
+use App\Services\SupplierApLedgers\SupplierApLedgerService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,11 +19,12 @@ class StockInService
     public function __construct(
         private readonly InventoryDocumentService $inventoryDocumentService,
         private readonly InventoryLedgerService $inventoryLedgerService,
+        private readonly SupplierApLedgerService $supplierApLedgerService,
     ) {}
 
     public function paginate(array $filters = []): LengthAwarePaginator|Collection
     {
-        $query = StockIn::query()->with(['warehouse', 'creator', 'items.item', 'items.unit'])->filter($filters)->latest();
+        $query = StockIn::query()->with(['warehouse', 'supplier', 'cashbook', 'creator', 'items.item', 'items.unit'])->filter($filters)->latest();
 
         if (! isset($filters['page'])) {
             return $query->get();
@@ -46,6 +48,9 @@ class StockInService
 
             $values = [
                 'warehouse_id' => $data['warehouse_id'],
+                'supplier_id' => $data['supplier_id'],
+                'cashbook_id' => $data['cashbook_id'] ?? null,
+                'paid_amount' => $data['paid_amount'],
                 'transaction_date' => $data['transaction_date'],
                 'remark' => $data['remark'] ?? null,
             ];
@@ -61,8 +66,23 @@ class StockInService
             $stockIn = StockIn::query()->updateOrCreate(['id' => $data['id'] ?? null], $values);
 
             $this->syncItems($stockIn, $data['items']);
+            $totalAmount = (float) $stockIn->items()->sum('total_cost');
 
-            return new StockInResource($stockIn->refresh()->load(['warehouse', 'creator', 'items.item', 'items.unit']));
+            if ($this->decimal((float) $data['total_amount']) !== $this->decimal($totalAmount)) {
+                throw ValidationException::withMessages([
+                    'total_amount' => ['Total amount must equal the sum of the item total costs.'],
+                ]);
+            }
+
+            if ((float) $data['paid_amount'] > $totalAmount) {
+                throw ValidationException::withMessages([
+                    'paid_amount' => ['Paid amount cannot exceed the stock-in total amount.'],
+                ]);
+            }
+
+            $stockIn->update(['total_amount' => $this->decimal($totalAmount)]);
+
+            return new StockInResource($stockIn->refresh()->load(['warehouse', 'supplier', 'cashbook', 'creator', 'items.item', 'items.unit']));
         });
     }
 
@@ -92,11 +112,12 @@ class StockInService
 
             if ($status === StockInStatusEnum::Posted->value) {
                 $this->inventoryLedgerService->postIn($stockIn, $actor);
+                $this->supplierApLedgerService->postStockIn($stockIn, $actor);
             }
 
             $stockIn->update(['status' => $status]);
 
-            return new StockInResource($stockIn->refresh()->load(['warehouse', 'creator', 'items.item', 'items.unit']));
+            return new StockInResource($stockIn->refresh()->load(['warehouse', 'supplier', 'cashbook', 'creator', 'items.item', 'items.unit']));
         });
     }
 
@@ -108,17 +129,24 @@ class StockInService
         foreach ($items as $item) {
             $existingLine = filled($item['id'] ?? null) ? $stockIn->items()->find($item['id']) : null;
 
+            $totalCost = $item['total_cost'] ?? ((float) ($item['unit_cost'] ?? 0) * (float) $item['quantity']);
+
             $stockIn->items()->updateOrCreate(['id' => $item['id'] ?? null], [
                 'item_id' => $item['item_id'],
                 'unit_id' => $item['unit_id'],
                 'quantity' => $item['quantity'],
                 'base_quantity' => $this->inventoryDocumentService->baseQuantity((int) $item['item_id'], (int) $item['unit_id'], $item['quantity']),
                 'unit_cost' => $item['unit_cost'] ?? null,
-                'total_cost' => $item['total_cost'] ?? null,
+                'total_cost' => $this->decimal((float) $totalCost),
                 'batch_no' => $this->inventoryDocumentService->lineBatchNo($item, (string) $stockIn->transaction_date, $existingLine),
                 'expiry_date' => $item['expiry_date'] ?? null,
                 'remark' => $item['remark'] ?? null,
             ]);
         }
+    }
+
+    private function decimal(float $value): string
+    {
+        return number_format($value, 2, '.', '');
     }
 }

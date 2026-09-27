@@ -18,7 +18,7 @@ class StockInController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $stockIns = $this->stockInService->paginate($request->only(['search', 'warehouse_id', 'status', 'date_from', 'date_to', 'page', 'per_page']));
+        $stockIns = $this->stockInService->paginate($request->only(['search', 'warehouse_id', 'supplier_id', 'status', 'date_from', 'date_to', 'page', 'per_page']));
 
         return ApiResponse::resource('Stock ins retrieved successfully.', StockInResource::collection($stockIns));
     }
@@ -32,7 +32,7 @@ class StockInController extends Controller
 
     public function show(StockIn $stockIn): JsonResponse
     {
-        return ApiResponse::resource('Stock in retrieved successfully.', StockInResource::make($stockIn->load(['warehouse', 'creator', 'items.item', 'items.unit'])));
+        return ApiResponse::resource('Stock in retrieved successfully.', StockInResource::make($stockIn->load(['warehouse', 'supplier', 'cashbook', 'creator', 'items.item', 'items.unit'])));
     }
 
     public function destroy(StockIn $stockIn): JsonResponse

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Inventory\InventoryDocumentService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -67,9 +68,9 @@ class CashbookTransactionService
         ];
     }
 
-    public function post(array $data, ?User $actor = null): CashbookTransactionResource
+    public function post(array $data, ?User $actor = null, ?Model $reference = null): CashbookTransactionResource
     {
-        return DB::transaction(function () use ($data, $actor): CashbookTransactionResource {
+        return DB::transaction(function () use ($data, $actor, $reference): CashbookTransactionResource {
             $cashbook = Cashbook::query()->whereKey($data['cashbook_id'])->lockForUpdate()->firstOrFail();
 
             if (! $cashbook->is_active) {
@@ -97,6 +98,8 @@ class CashbookTransactionService
                 'amount' => $this->decimal($amount),
                 'balance_after' => $this->decimal($newBalance),
                 'transaction_date' => $data['transaction_date'],
+                'reference_type' => $reference?->getMorphClass(),
+                'reference_id' => $reference?->getKey(),
                 'remark' => $data['remark'] ?? null,
                 'created_by' => $actor?->id,
             ]);

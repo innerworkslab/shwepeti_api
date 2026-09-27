@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\AssetCategory;
 use App\Models\Cashbook;
 use App\Models\CashbookTransaction;
+use App\Models\FixedAsset;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryAdjustmentItem;
 use App\Models\InventoryTransfer;
@@ -22,6 +24,9 @@ use App\Models\StockIn;
 use App\Models\StockInItem;
 use App\Models\StockOut;
 use App\Models\StockOutItem;
+use App\Models\Supplier;
+use App\Models\SupplierApLedger;
+use App\Models\SupplierApPayment;
 use App\Models\Unit;
 use App\Models\UnitGroup;
 use App\Models\User;
@@ -46,8 +51,13 @@ class AppServiceProvider extends ServiceProvider
     {
         Relation::enforceMorphMap([
             'user' => User::class,
+            'asset_category' => AssetCategory::class,
+            'fixed_asset' => FixedAsset::class,
             'cashbook' => Cashbook::class,
             'cashbook_transaction' => CashbookTransaction::class,
+            'supplier' => Supplier::class,
+            'supplier_ap_payment' => SupplierApPayment::class,
+            'supplier_ap_ledger' => SupplierApLedger::class,
             'room_category' => RoomCategory::class,
             'room' => Room::class,
             'room_bed' => RoomBed::class,

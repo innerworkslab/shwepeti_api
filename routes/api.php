@@ -1,10 +1,12 @@
 <?php
 
 use App\Enums\UserRoleEnum;
+use App\Http\Controllers\Api\V1\Admin\AssetCategoryController;
 use App\Http\Controllers\Api\V1\Admin\AuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AuthController;
 use App\Http\Controllers\Api\V1\Admin\CashbookController;
 use App\Http\Controllers\Api\V1\Admin\CashbookTransactionController;
+use App\Http\Controllers\Api\V1\Admin\FixedAssetController;
 use App\Http\Controllers\Api\V1\Admin\InventoryAdjustmentController;
 use App\Http\Controllers\Api\V1\Admin\InventoryLedgerController;
 use App\Http\Controllers\Api\V1\Admin\InventoryStockBalanceController;
@@ -18,6 +20,10 @@ use App\Http\Controllers\Api\V1\Admin\RoomCategoryController;
 use App\Http\Controllers\Api\V1\Admin\RoomController;
 use App\Http\Controllers\Api\V1\Admin\StockInController;
 use App\Http\Controllers\Api\V1\Admin\StockOutController;
+use App\Http\Controllers\Api\V1\Admin\SupplierApBalanceController;
+use App\Http\Controllers\Api\V1\Admin\SupplierApLedgerController;
+use App\Http\Controllers\Api\V1\Admin\SupplierApPaymentController;
+use App\Http\Controllers\Api\V1\Admin\SupplierController;
 use App\Http\Controllers\Api\V1\Admin\UnitController;
 use App\Http\Controllers\Api\V1\Admin\UnitGroupController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
@@ -74,6 +80,17 @@ Route::prefix('v1/admin')->group(function (): void {
             Route::apiResource('cashbooks', CashbookController::class)->except(['update']);
             Route::post('cashbooks/{cashbook}/toggle-active', [CashbookController::class, 'toggleActive']);
             Route::apiResource('cashbook-transactions', CashbookTransactionController::class)->only(['index', 'store', 'show']);
+            Route::apiResource('asset-categories', AssetCategoryController::class)->except(['update']);
+            Route::post('asset-categories/{assetCategory}/toggle-active', [AssetCategoryController::class, 'toggleActive']);
+            Route::apiResource('fixed-assets', FixedAssetController::class)->except(['update']);
+            Route::post('fixed-assets/{fixedAsset}/status', [FixedAssetController::class, 'status']);
+            Route::apiResource('suppliers', SupplierController::class)->except(['update']);
+            Route::post('suppliers/{supplier}/toggle-active', [SupplierController::class, 'toggleActive']);
+            Route::post('suppliers/{supplier}/restore', [SupplierController::class, 'restore']);
+            Route::apiResource('supplier-ap-payments', SupplierApPaymentController::class)->except(['update']);
+            Route::post('supplier-ap-payments/{supplierApPayment}/status', [SupplierApPaymentController::class, 'status']);
+            Route::apiResource('supplier-ap-balances', SupplierApBalanceController::class)->only(['index', 'show']);
+            Route::apiResource('supplier-ap-ledgers', SupplierApLedgerController::class)->only(['index', 'show']);
         });
     });
 });

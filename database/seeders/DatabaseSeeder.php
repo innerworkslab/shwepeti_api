@@ -28,10 +28,13 @@ class DatabaseSeeder extends Seeder
         $this->call([
             UnitSeeder::class,
             ItemCategorySeeder::class,
+            AssetCategorySeeder::class,
             ItemSeeder::class,
             MenuCategorySeeder::class,
             MenuSeeder::class,
             WarehouseSeeder::class,
+            CashbookSeeder::class,
+            SupplierSeeder::class,
         ]);
     }
 }

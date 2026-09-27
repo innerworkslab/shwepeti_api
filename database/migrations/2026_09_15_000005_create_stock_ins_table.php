@@ -12,6 +12,10 @@ return new class extends Migration
             $table->id();
             $table->string('reference_no')->unique();
             $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
+            $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->restrictOnDelete();
+            $table->foreignId('cashbook_id')->nullable()->constrained('cashbooks')->restrictOnDelete();
+            $table->decimal('total_amount', 18, 2)->default(0);
+            $table->decimal('paid_amount', 18, 2)->default(0);
             $table->dateTime('transaction_date');
             $table->string('status')->default('draft')->index();
             $table->text('remark')->nullable();
@@ -19,6 +23,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index('warehouse_id');
+            $table->index('supplier_id');
+            $table->index('cashbook_id');
             $table->index('transaction_date');
         });
     }

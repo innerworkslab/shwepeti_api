@@ -1,16 +1,15 @@
 <?php
 
-namespace App\Http\Resources\StockIns;
+namespace App\Http\Resources\SupplierApPayments;
 
 use App\Http\Resources\Cashbooks\CashbookResource;
 use App\Http\Resources\Concerns\FormatsDateTime;
 use App\Http\Resources\Suppliers\SupplierResource;
 use App\Http\Resources\Users\UserResource;
-use App\Http\Resources\Warehouses\WarehouseResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class StockInResource extends JsonResource
+class SupplierApPaymentResource extends JsonResource
 {
     use FormatsDateTime;
 
@@ -19,21 +18,16 @@ class StockInResource extends JsonResource
         return [
             'id' => $this->id,
             'reference_no' => $this->reference_no,
-            'warehouse_id' => $this->warehouse_id,
             'supplier_id' => $this->supplier_id,
             'cashbook_id' => $this->cashbook_id,
-            'total_amount' => $this->total_amount,
-            'paid_amount' => $this->paid_amount,
-            'payable_amount' => number_format((float) $this->total_amount - (float) $this->paid_amount, 2, '.', ''),
-            'transaction_date' => $this->dateTime($this->transaction_date),
-            'status' => $this->status?->value,
+            'amount' => $this->amount,
+            'payment_date' => $this->dateTime($this->payment_date),
+            'status' => $this->status->value,
             'remark' => $this->remark,
             'created_by' => $this->created_by,
-            'warehouse' => WarehouseResource::make($this->whenLoaded('warehouse')),
             'supplier' => SupplierResource::make($this->whenLoaded('supplier')),
             'cashbook' => CashbookResource::make($this->whenLoaded('cashbook')),
             'creator' => UserResource::make($this->whenLoaded('creator')),
-            'items' => StockInItemResource::collection($this->whenLoaded('items')),
             'created_at' => $this->dateTime($this->created_at),
             'updated_at' => $this->dateTime($this->updated_at),
         ];
