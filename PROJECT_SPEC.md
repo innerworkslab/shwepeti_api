@@ -4,7 +4,7 @@
 
 Shwe Peti is a Laravel backend API application for managing hotel administration data. The system is designed for an internal admin web dashboard and exposes versioned REST APIs secured with Laravel Sanctum authentication.
 
-The current release focuses on internal staff accounts, room setup, inventory setup, item master data, unit conversions, inventory stock movements, audit logs, soft deletes where needed, and consistent API responses.
+The current release focuses on internal staff accounts, room setup, inventory setup, item master data, unit conversions, inventory stock movements, cashbook management, fixed asset management, audit logs, soft deletes where needed, and consistent API responses.
 
 ## 2. Goals
 
@@ -15,6 +15,8 @@ The current release focuses on internal staff accounts, room setup, inventory se
 - Manage unit groups, units, item categories, items, and item unit conversions.
 - Manage warehouses and inventory stock transactions.
 - Maintain inventory ledgers and stock balances from posted stock documents.
+- Manage hierarchical asset categories and fixed asset purchases.
+- Record each posted fixed asset purchase as exactly one cashbook expense transaction.
 - Keep API responses consistent across success, validation, authentication, authorization, and error states.
 - Preserve important operational history with audit logs.
 - Use API versioning so future dashboard, mobile, or third-party clients can evolve safely.
@@ -41,6 +43,11 @@ The current release focuses on internal staff accounts, room setup, inventory se
 - Draft, posted, and cancelled status workflows for inventory documents.
 - Inventory ledger retrieval and stock balance retrieval.
 - Warehouse-specific item list with stock balance quantity and stock unit.
+- Cashbook and cashbook transaction management.
+- Hierarchical asset category CRUD and active toggle.
+- Fixed asset draft, posted, and cancelled workflows.
+- Fixed asset document metadata stored as JSON.
+- Idempotent asset category seed data for hotel operations.
 - Soft delete and restore support where appropriate.
 - Audit logging for model create, update, delete, and restore events using `owen-it/laravel-auditing`.
 - MySQL database support for local development, testing, and production.
@@ -690,6 +697,8 @@ Supported entities:
 - Stock documents
 - Inventory transfers
 - Inventory adjustments
+- Asset categories
+- Fixed assets
 
 Activity history must include:
 
@@ -699,6 +708,74 @@ Activity history must include:
 - Previous values where applicable
 - New values where applicable
 - Timestamp
+
+### 6.11 Asset and Cashbook Management
+
+Asset categories organize fixed assets and may be nested through an optional `parent_id`.
+
+Asset category fields:
+
+- `parent_id`, nullable
+- `name`
+- `slug`
+- `code`
+- `description`, nullable
+- `is_active`
+
+Asset category rules:
+
+- `name` is trimmed and repeated whitespace is normalized.
+- `slug` is generated from `name` when omitted and must be unique.
+- `code` is normalized to uppercase snake case and must be unique.
+- A category cannot be its own parent.
+- A category with child categories or assigned fixed assets cannot be deleted.
+- Non-paginated lists return active categories only.
+- `GET /api/v1/admin/asset-categories?parent_id=` returns active top-level categories for parent dropdowns.
+- `GET /api/v1/admin/asset-categories?parent_id={id}` returns active children of that category.
+
+Fixed asset fields:
+
+- `reference_no`, generated when omitted
+- `asset_code`, unique
+- `asset_category_id`
+- `cashbook_id`
+- `name`
+- `serial_number`, nullable
+- `location`, nullable
+- `purchase_date`
+- `purchase_amount`
+- `warranty_expiry_date`, nullable
+- `documents`, nullable JSON array
+- `status`
+- `remark`, nullable
+- `created_by`, nullable
+
+Fixed asset statuses:
+
+- `draft`
+- `posted`
+- `cancelled`
+
+Fixed asset rules:
+
+- New fixed assets default to `draft`.
+- `asset_code` is normalized to uppercase with spaces converted to hyphens.
+- `purchase_amount` must be greater than `0`.
+- `warranty_expiry_date`, when provided, must not be earlier than `purchase_date`.
+- `documents` accepts a JSON array of document metadata, such as `name` and `path` values.
+- Only draft fixed assets may be updated, deleted, posted, or cancelled.
+- Cancelling a draft fixed asset does not affect its cashbook.
+- Posting a draft fixed asset creates exactly one `expense` cashbook transaction for `purchase_amount`.
+- The cashbook transaction uses the fixed asset as its polymorphic reference.
+- Fixed asset posting, cashbook balance update, cashbook transaction creation, and status update occur atomically in one database transaction.
+- The fixed asset row and cashbook row are locked during posting to prevent duplicate posting and balance races.
+- Posting fails when the cashbook is inactive or has insufficient balance; the fixed asset remains draft and no cashbook transaction is created.
+- A posted fixed asset cannot be posted again, updated, or deleted.
+
+Asset category seed data:
+
+- `AssetCategorySeeder` is idempotent and creates 18 active categories.
+- Parent groups are Property, Furniture & Fixtures, Equipment, and Vehicles.
 
 ## 7. Non-Functional Requirements
 
@@ -1128,7 +1205,76 @@ Unique index:
 | `created_at` | timestamp | Event time |
 | `updated_at` | timestamp | Laravel default |
 
-### 8.22 Relationships
+### 8.22 Cashbooks Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `code` | string | Unique cashbook code |
+| `name` | string | Display name |
+| `type` | string | Cash or bank enum value |
+| `opening_balance` | decimal(18, 2) | Initial balance |
+| `current_balance` | decimal(18, 2) | Current balance after posted transactions |
+| `description` | text nullable | Optional description |
+| `is_active` | boolean | Active state |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.23 Cashbook Transactions Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `reference_no` | string | Unique generated transaction reference |
+| `cashbook_id` | unsigned big integer | Foreign key to cashbooks |
+| `transaction_type` | string | `income` or `expense` |
+| `amount` | decimal(18, 2) | Positive transaction amount |
+| `balance_after` | decimal(18, 2) | Cashbook balance after this transaction |
+| `transaction_date` | date-time | Effective transaction date |
+| `reference_type` | string nullable | Polymorphic reference alias |
+| `reference_id` | unsigned big integer nullable | Polymorphic reference id |
+| `remark` | text nullable | Transaction description |
+| `created_by` | unsigned big integer nullable | Foreign key to users |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.24 Asset Categories Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `parent_id` | unsigned big integer nullable | Self-referencing parent category |
+| `name` | string | Category name |
+| `slug` | string | Unique slug |
+| `code` | string | Unique normalized code |
+| `description` | text nullable | Optional description |
+| `is_active` | boolean | Active state |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.25 Fixed Assets Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `reference_no` | string | Unique generated document reference |
+| `asset_code` | string | Unique normalized asset code |
+| `asset_category_id` | unsigned big integer | Foreign key to asset categories |
+| `cashbook_id` | unsigned big integer | Foreign key to cashbooks |
+| `name` | string | Asset name |
+| `serial_number` | string nullable | Manufacturer serial number |
+| `location` | string nullable | Current asset location |
+| `purchase_date` | date-time | Purchase transaction date |
+| `purchase_amount` | decimal(18, 2) | Cash purchase amount |
+| `warranty_expiry_date` | date nullable | Warranty expiration date |
+| `documents` | JSON nullable | Array of document metadata |
+| `status` | string | `draft`, `posted`, or `cancelled` |
+| `remark` | text nullable | Optional notes |
+| `created_by` | unsigned big integer nullable | Foreign key to users |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.26 Relationships
 
 - User has many created room categories.
 - User has many updated room categories.
@@ -1160,6 +1306,11 @@ Unique index:
 - Inventory adjustment belongs to warehouse and has many adjustment items.
 - Inventory ledger belongs to item, warehouse, unit, and creator.
 - Inventory stock balance belongs to item and warehouse.
+- Cashbook has many cashbook transactions.
+- Asset category belongs to an optional parent asset category.
+- Asset category has many child asset categories and fixed assets.
+- Fixed asset belongs to an asset category, cashbook, and creator.
+- Fixed asset has one polymorphically linked cashbook transaction after posting.
 - Audit belongs to user.
 - Audit morphs to auditable entity.
 
@@ -1371,6 +1522,132 @@ Audit filters:
 - `page`
 - `per_page`
 
+### 9.18 Cashbook Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/cashbooks` | List cashbooks |
+| `POST` | `/api/v1/admin/cashbooks` | Create or update a cashbook; include `id` to update |
+| `GET` | `/api/v1/admin/cashbooks/{cashbook}` | Show cashbook |
+| `DELETE` | `/api/v1/admin/cashbooks/{cashbook}` | Delete cashbook when allowed |
+| `POST` | `/api/v1/admin/cashbooks/{cashbook}/toggle-active` | Change active state |
+
+Cashbook filters:
+
+- `search`
+- `type`
+- `is_active`
+- `page`
+- `per_page`
+
+### 9.19 Cashbook Transaction Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/cashbook-transactions` | List cashbook transactions and balance summary |
+| `POST` | `/api/v1/admin/cashbook-transactions` | Post a direct income or expense transaction |
+| `GET` | `/api/v1/admin/cashbook-transactions/{cashbook_transaction}` | Show cashbook transaction |
+
+Cashbook transaction filters:
+
+- `search`
+- `cashbook_id`
+- `transaction_type`
+- `date_from`
+- `date_to`
+- `page`
+- `per_page`
+
+### 9.20 Asset Category Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/asset-categories` | List active categories without pagination or all matching categories with pagination |
+| `POST` | `/api/v1/admin/asset-categories` | Create or update a category; include `id` to update |
+| `GET` | `/api/v1/admin/asset-categories/{asset_category}` | Show category |
+| `DELETE` | `/api/v1/admin/asset-categories/{asset_category}` | Delete category when it has no children or fixed assets |
+| `POST` | `/api/v1/admin/asset-categories/{assetCategory}/toggle-active` | Change active state |
+
+Asset category filters:
+
+- `search`
+- `parent_id`; send an empty value to list top-level parent categories
+- `is_active`
+- `page`
+- `per_page`
+
+Create asset category payload example:
+
+```json
+{
+  "parent_id": 3,
+  "name": "Kitchen Equipment",
+  "code": "KITCHEN_EQUIPMENT",
+  "description": "Fixed equipment used in hotel kitchens",
+  "is_active": true
+}
+```
+
+### 9.21 Fixed Asset Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/fixed-assets` | List fixed assets |
+| `POST` | `/api/v1/admin/fixed-assets` | Create or update a draft fixed asset; include `id` to update |
+| `GET` | `/api/v1/admin/fixed-assets/{fixed_asset}` | Show fixed asset and linked cashbook transaction |
+| `DELETE` | `/api/v1/admin/fixed-assets/{fixed_asset}` | Delete a draft fixed asset |
+| `POST` | `/api/v1/admin/fixed-assets/{fixedAsset}/status` | Post or cancel a draft fixed asset |
+
+Fixed asset filters:
+
+- `search`; matches reference number, asset code, name, or serial number
+- `asset_category_id`
+- `cashbook_id`
+- `status`
+- `date_from`
+- `date_to`
+- `page`
+- `per_page`
+
+Create fixed asset payload example:
+
+```json
+{
+  "asset_code": "FA-001",
+  "asset_category_id": 3,
+  "cashbook_id": 1,
+  "name": "Commercial Refrigerator",
+  "serial_number": "SN-10001",
+  "location": "Main Kitchen",
+  "purchase_date": "2026-09-27 10:00:00",
+  "purchase_amount": 2500000,
+  "warranty_expiry_date": "2027-09-27",
+  "documents": [
+    {
+      "name": "Purchase Invoice",
+      "path": "fixed-assets/fa-001/invoice.pdf"
+    }
+  ],
+  "remark": "Purchased from ABC Equipment"
+}
+```
+
+Post fixed asset payload:
+
+```json
+{
+  "status": "posted"
+}
+```
+
+Cancel fixed asset payload:
+
+```json
+{
+  "status": "cancelled"
+}
+```
+
 ## 10. UI Overview
 
 The initial Laravel project is backend-only. The API is intended for an admin web dashboard built separately.
@@ -1399,6 +1676,11 @@ Expected dashboard screens:
 - Inventory ledger screen
 - Inventory stock balance screen
 - Warehouse item balance screen
+- Cashbook list/create/edit screen
+- Cashbook transaction list and balance summary screen
+- Asset category tree/list/create/edit screen
+- Fixed asset list/create/edit/status screen
+- Fixed asset detail screen with linked cashbook transaction and documents
 - Audit log screen
 - Audit log detail screen
 
@@ -1406,9 +1688,10 @@ Expected dashboard behaviors:
 
 - Use bearer-token authentication with Sanctum.
 - Show server validation errors next to relevant fields.
-- Use pagination for user, room category, room, inventory, item, conversion, transaction, ledger, balance, and audit log lists.
+- Use pagination for user, room category, room, inventory, item, conversion, transaction, ledger, balance, cashbook, asset, and audit log lists.
 - Provide filters for active/inactive setup data, item category, stock unit, room category, room status, audit event, audit module, audit record id, and date range.
 - For non-paginated dropdown lists, expect active records only.
+- Use `GET /api/v1/admin/asset-categories?parent_id=` for the active top-level asset category parent dropdown.
 - Confirm destructive actions before delete.
 - Show restore action only to roles with restore permission.
 - Display date/time values as `YYYY-MM-DD HH:mm:ss`.
@@ -1531,6 +1814,26 @@ Expected dashboard behaviors:
 6. Authorized user may later request restore.
 7. API restores the record and records the restore event.
 
+### 11.12 Create and Post Fixed Asset
+
+1. Authorized user selects an asset category and active cashbook.
+2. User submits `asset_code`, name, purchase date, purchase amount, and optional asset details and documents.
+3. API validates the payload, generates `reference_no` when omitted, and creates the fixed asset as `draft`.
+4. User may update or delete the fixed asset while it remains draft.
+5. Authorized user posts the asset through `POST /api/v1/admin/fixed-assets/{fixedAsset}/status` with `status = posted`.
+6. API locks the fixed asset and cashbook rows.
+7. API validates that the fixed asset is still draft, the cashbook is active, and its balance is sufficient.
+8. API creates exactly one cashbook `expense` transaction linked through `reference_type = fixed_asset` and the fixed asset id.
+9. API subtracts `purchase_amount` from the cashbook balance and changes the fixed asset status to `posted` in the same database transaction.
+10. Any failure rolls back the cashbook transaction, balance update, and status update together.
+
+### 11.13 Cancel Fixed Asset
+
+1. Authorized user selects a draft fixed asset.
+2. User submits `status = cancelled` through the fixed asset status endpoint.
+3. API validates that the fixed asset is still draft.
+4. API changes the status to `cancelled` without creating a cashbook transaction or changing the cashbook balance.
+
 ## 12. Permissions
 
 Permissions should be role-based for the initial release. Granular permissions can be added later if required.
@@ -1554,6 +1857,8 @@ Permissions should be role-based for the initial release. Granular permissions c
 | Manage stock documents | Yes | No | No | No | No | Yes |
 | View inventory ledgers | Yes | No | No | No | No | Yes |
 | View stock balances | Yes | No | No | No | No | Yes |
+| Manage cashbooks and transactions | Yes | No | No | No | No | No |
+| Manage asset categories and fixed assets | Yes | No | No | No | No | No |
 | View audit logs | Yes | No | No | No | No | No |
 | View activity history through audit logs | Yes | No | No | No | No | No |
 | Restore deleted records | Yes | No | No | No | No | No |
@@ -1574,6 +1879,8 @@ app/
   Enums/
     AdjustmentStatusEnum.php
     AdjustmentTypeEnum.php
+    CashbookTransactionTypeEnum.php
+    FixedAssetStatusEnum.php
     RoomBedTypeEnum.php
     RoomStatusEnum.php
     StockInStatusEnum.php
@@ -1585,8 +1892,12 @@ app/
       Api/
         V1/
           Admin/
+            AssetCategoryController.php
             AuditLogController.php
             AuthController.php
+            CashbookController.php
+            CashbookTransactionController.php
+            FixedAssetController.php
             InventoryAdjustmentController.php
             InventoryLedgerController.php
             InventoryStockBalanceController.php
@@ -1603,7 +1914,11 @@ app/
             UserController.php
             WarehouseController.php
     Requests/
+      AssetCategories/
       Auth/
+      Cashbooks/
+      CashbookTransactions/
+      FixedAssets/
       InventoryAdjustments/
       InventoryTransfers/
       ItemCategories/
@@ -1618,10 +1933,18 @@ app/
       Users/
       Warehouses/
     Resources/
+      AssetCategories/
+        AssetCategoryResource.php
       AuditLogs/
         AuditLogResource.php
+      Cashbooks/
+        CashbookResource.php
+      CashbookTransactions/
+        CashbookTransactionResource.php
       Concerns/
         FormatsDateTime.php
+      FixedAssets/
+        FixedAssetResource.php
       InventoryAdjustments/
         InventoryAdjustmentResource.php
         InventoryAdjustmentItemResource.php
@@ -1659,6 +1982,10 @@ app/
       Warehouses/
         WarehouseResource.php
   Models/
+    AssetCategory.php
+    Cashbook.php
+    CashbookTransaction.php
+    FixedAsset.php
     InventoryAdjustment.php
     InventoryAdjustmentItem.php
     InventoryLedger.php
@@ -1685,10 +2012,18 @@ app/
     RoomPolicy.php
     AuditLogPolicy.php
   Services/
+    AssetCategories/
+      AssetCategoryService.php
     AuditLogs/
       AuditLogService.php
     Auth/
       AuthService.php
+    Cashbooks/
+      CashbookService.php
+    CashbookTransactions/
+      CashbookTransactionService.php
+    FixedAssets/
+      FixedAssetService.php
     Inventory/
       InventoryDocumentService.php
     InventoryAdjustments/
@@ -1812,6 +2147,23 @@ app/
   - `inventory_ledgers.transaction_date`
   - `inventory_ledgers.batch_no`
   - unique composite index on `inventory_stock_balances.item_id` and `warehouse_id`
+  - `cashbooks.code`
+  - `cashbooks.type`
+  - `cashbooks.is_active`
+  - `cashbook_transactions.reference_no`
+  - `cashbook_transactions.cashbook_id`, `cashbook_transactions.transaction_date`
+  - `cashbook_transactions.transaction_type`
+  - `cashbook_transactions.reference_type`, `cashbook_transactions.reference_id`
+  - `asset_categories.parent_id`
+  - `asset_categories.slug`
+  - `asset_categories.code`
+  - `asset_categories.is_active`
+  - `fixed_assets.reference_no`
+  - `fixed_assets.asset_code`
+  - `fixed_assets.asset_category_id`, `fixed_assets.purchase_date`
+  - `fixed_assets.cashbook_id`, `fixed_assets.purchase_date`
+  - `fixed_assets.serial_number`
+  - `fixed_assets.status`
   - `audits.user_id`, `audits.user_type`
   - `audits.auditable_type`, `audits.auditable_id`
   - `audits.created_at`
@@ -1823,6 +2175,10 @@ Use `Relation::enforceMorphMap()` so polymorphic database values are stable alia
 Required aliases:
 
 - `user`
+- `asset_category`
+- `fixed_asset`
+- `cashbook`
+- `cashbook_transaction`
 - `room_category`
 - `room`
 - `room_bed`
@@ -1943,6 +2299,9 @@ Required aliases:
 - Add feature tests for inventory transfer posting and cancellation.
 - Add feature tests for inventory adjustment posting and cancellation.
 - Add tests for inventory ledger and stock balance responses.
+- Add tests for asset category hierarchy, active lists, and idempotent seed data.
+- Add tests proving a fixed asset creates exactly one cashbook transaction when posted.
+- Add tests for duplicate-post protection, immutable posted assets, insufficient cashbook balance, and atomic rollback.
 - Add tests for backend-generated reference numbers, batch numbers, and base quantities.
 - Add tests for consistent API responses.
 - Add tests for soft delete and restore behavior.
@@ -1959,6 +2318,8 @@ Required aliases:
 - Document item and conversion APIs.
 - Document warehouse and inventory transaction APIs.
 - Document inventory posting behavior and ledger transaction types.
+- Document cashbook, asset category, and fixed asset APIs.
+- Document fixed asset payloads, document metadata, and atomic cashbook posting behavior.
 - Document backend-generated fields.
 - Document audit log filters and morph aliases.
 - Document role permissions.
@@ -1979,3 +2340,5 @@ Required aliases:
 - Should Inventory Administrator get access to inventory transaction APIs now, or remain behind Hotel Administrator middleware until granular permissions are added?
 - Should inventory stock out and transfer support FIFO/FEFO batch selection rules later?
 - Should cancelled posted stock documents be reversible through a formal reversal document instead of status changes?
+- Should fixed asset documents remain external path metadata, or should a dedicated upload and document storage API be added?
+- Should fixed asset depreciation and disposal workflows be added in a later phase?
