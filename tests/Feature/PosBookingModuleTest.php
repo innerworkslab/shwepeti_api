@@ -43,6 +43,49 @@ class PosBookingModuleTest extends TestCase
             ->assertJsonPath('data.0.status', RoomStatusEnum::Available->value);
     }
 
+    public function test_it_returns_booking_dashboard_grouped_by_room_category(): void
+    {
+        $category = RoomCategory::query()->create([
+            'name' => 'Standard',
+            'is_active' => true,
+        ]);
+
+        $roomOne = Room::query()->create([
+            'name' => 'Room 101',
+            'room_category_id' => $category->id,
+            'price' => 100,
+            'status' => RoomStatusEnum::Available->value,
+        ]);
+
+        Room::query()->create([
+            'name' => 'Room 102',
+            'room_category_id' => $category->id,
+            'price' => 100,
+            'status' => RoomStatusEnum::Available->value,
+        ]);
+
+        $this->withHeaders($this->posAuthHeaders())
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $roomOne->id,
+                'booking_type' => BookingTypeEnum::Reservation->value,
+                'guest_name' => 'Dashboard Guest',
+                'expected_check_in_at' => '2026-10-07 14:00:00',
+                'expected_check_out_at' => '2026-10-08 12:00:00',
+            ])->assertCreated();
+
+        $this->withHeaders($this->posAuthHeaders())
+            ->getJson('/api/v1/pos/booking-dashboard?start_date=2026-10-07&end_date=2026-10-08')
+            ->assertOk()
+            ->assertJsonPath('data.start_date', '2026-10-07')
+            ->assertJsonPath('data.end_date', '2026-10-08')
+            ->assertJsonPath('data.dates.0.date', '2026-10-07')
+            ->assertJsonPath('data.room_categories.0.name', 'Standard')
+            ->assertJsonPath('data.room_categories.0.availability.0.total_count', 2)
+            ->assertJsonPath('data.room_categories.0.availability.0.booked_count', 1)
+            ->assertJsonPath('data.room_categories.0.availability.0.available_count', 1)
+            ->assertJsonPath('data.room_categories.0.rooms.0.bookings.0.guest_name', 'Dashboard Guest');
+    }
+
     public function test_it_creates_a_reserved_booking_and_marks_room_reserved(): void
     {
         $room = $this->createAvailableRoom();

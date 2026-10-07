@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Pos\AuthController;
 use App\Http\Controllers\Api\V1\Pos\BookingController;
+use App\Http\Controllers\Api\V1\Pos\BookingDashboardController;
 use App\Http\Controllers\Api\V1\Pos\RoomController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,6 +16,7 @@ Route::prefix('v1/pos')->name('pos.')->group(function (): void {
         Route::get('rooms/available', [RoomController::class, 'available']);
         Route::apiResource('rooms', RoomController::class)->only(['index', 'show']);
 
+        Route::get('booking-dashboard', [BookingDashboardController::class, 'index']);
         Route::apiResource('bookings', BookingController::class)->only(['index', 'store', 'show']);
         Route::post('bookings/{booking}/payments', [BookingController::class, 'partialPayment']);
         Route::post('bookings/{booking}/check-in', [BookingController::class, 'checkIn']);
