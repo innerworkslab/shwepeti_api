@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\UserPortalAccessEnum;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -19,6 +20,7 @@ return new class extends Migration
             $table->timestamp('last_login_at')->nullable();
             $table->string('password');
             $table->string('role')->index();
+            $table->string('portal_access')->default(UserPortalAccessEnum::Admin->value)->index();
             $table->boolean('is_active')->default(true);
             $table->rememberToken();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();

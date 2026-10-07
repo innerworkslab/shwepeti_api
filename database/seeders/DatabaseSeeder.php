@@ -2,8 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Enums\UserRoleEnum;
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -16,16 +14,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::query()->updateOrCreate([
-            'email' => 'admin@example.com',
-        ], [
-            'name' => 'Hotel Administrator',
-            'password' => 'password',
-            'role' => UserRoleEnum::HotelAdministrator->value,
-            'is_active' => true,
-        ]);
-
         $this->call([
+            UserSeeder::class,
             UnitSeeder::class,
             ItemCategorySeeder::class,
             AssetCategorySeeder::class,

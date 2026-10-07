@@ -20,6 +20,7 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'role' => $this->role?->value,
+            'portal_access' => $this->portal_access?->value,
             'is_active' => $this->is_active,
             'email_verified_at' => $this->dateTime($this->email_verified_at),
             'last_login_at' => $this->dateTime($this->last_login_at),

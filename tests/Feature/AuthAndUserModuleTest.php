@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\UserPortalAccessEnum;
 use App\Enums\UserRoleEnum;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,7 +28,60 @@ class AuthAndUserModuleTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.token_type', 'Bearer')
+            ->assertJsonPath('data.user.portal_access', UserPortalAccessEnum::Admin->value)
             ->assertJsonStructure(['data' => ['token', 'user']]);
+    }
+
+    public function test_it_logs_in_a_pos_user_through_the_pos_portal(): void
+    {
+        User::factory()->create([
+            'email' => 'cashier@example.com',
+            'password' => 'password',
+            'role' => UserRoleEnum::RestaurantAdministrator->value,
+            'portal_access' => UserPortalAccessEnum::Pos->value,
+        ]);
+
+        $response = $this->postJson('/api/v1/pos/login', [
+            'email' => 'cashier@example.com',
+            'password' => 'password',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.portal_access', UserPortalAccessEnum::Pos->value)
+            ->assertJsonStructure(['data' => ['token', 'user']]);
+    }
+
+    public function test_it_blocks_pos_only_users_from_admin_login(): void
+    {
+        User::factory()->create([
+            'email' => 'cashier@example.com',
+            'password' => 'password',
+            'role' => UserRoleEnum::RestaurantAdministrator->value,
+            'portal_access' => UserPortalAccessEnum::Pos->value,
+        ]);
+
+        $this->postJson('/api/v1/admin/login', [
+            'email' => 'cashier@example.com',
+            'password' => 'password',
+        ])->assertUnprocessable()
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_it_blocks_admin_only_users_from_pos_login(): void
+    {
+        User::factory()->create([
+            'email' => 'admin@example.com',
+            'password' => 'password',
+            'role' => UserRoleEnum::HotelAdministrator->value,
+            'portal_access' => UserPortalAccessEnum::Admin->value,
+        ]);
+
+        $this->postJson('/api/v1/pos/login', [
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ])->assertUnprocessable()
+            ->assertJsonPath('success', false);
     }
 
     public function test_it_allows_a_hotel_administrator_to_create_update_delete_and_restore_users(): void
@@ -50,11 +104,13 @@ class AuthAndUserModuleTest extends TestCase
             'email' => 'front@example.com',
             'password' => 'password',
             'role' => UserRoleEnum::FrontOfficeAdministrator->value,
+            'portal_access' => UserPortalAccessEnum::Pos->value,
             'is_active' => true,
         ]);
 
         $created->assertCreated()
             ->assertJsonPath('data.email', 'front@example.com')
+            ->assertJsonPath('data.portal_access', UserPortalAccessEnum::Pos->value)
             ->assertJsonPath('data.created_by', $admin->id);
 
         $userId = $created->json('data.id');
@@ -64,9 +120,11 @@ class AuthAndUserModuleTest extends TestCase
             'name' => 'Front Office Updated',
             'email' => 'front@example.com',
             'role' => UserRoleEnum::FrontOfficeAdministrator->value,
+            'portal_access' => UserPortalAccessEnum::Both->value,
             'is_active' => false,
         ])->assertOk()
             ->assertJsonPath('data.name', 'Front Office Updated')
+            ->assertJsonPath('data.portal_access', UserPortalAccessEnum::Both->value)
             ->assertJsonPath('data.is_active', false)
             ->assertJsonPath('data.updated_by', $admin->id);
 

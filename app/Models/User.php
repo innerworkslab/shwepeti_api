@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\UserPortalAccessEnum;
 use App\Enums\UserRoleEnum;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
@@ -21,6 +22,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
     'email',
     'password',
     'role',
+    'portal_access',
     'is_active',
     'last_login_at',
     'created_by',
@@ -38,6 +40,12 @@ class User extends Authenticatable implements AuditableContract
         return $this->role === UserRoleEnum::HotelAdministrator;
     }
 
+    public function canAccessPortal(UserPortalAccessEnum $portal): bool
+    {
+        return $this->portal_access === UserPortalAccessEnum::Both
+            || $this->portal_access === $portal;
+    }
+
     /**
      * @param  Builder<User>  $query
      * @param  array<string, mixed>  $filters
@@ -53,6 +61,7 @@ class User extends Authenticatable implements AuditableContract
                 });
             })
             ->when($filters['role'] ?? null, fn (Builder $query, string $role) => $query->where('role', $role))
+            ->when($filters['portal_access'] ?? null, fn (Builder $query, string $portalAccess) => $query->where('portal_access', $portalAccess))
             ->when(
                 array_key_exists('is_active', $filters),
                 fn (Builder $query) => $query->where('is_active', filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN)),
@@ -72,6 +81,7 @@ class User extends Authenticatable implements AuditableContract
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRoleEnum::class,
+            'portal_access' => UserPortalAccessEnum::class,
         ];
     }
 }

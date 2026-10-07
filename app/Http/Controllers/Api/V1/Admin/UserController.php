@@ -17,7 +17,7 @@ class UserController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $users = $this->userService->paginate($request->only(['search', 'role', 'is_active', 'page', 'per_page']));
+        $users = $this->userService->paginate($request->only(['search', 'role', 'portal_access', 'is_active', 'page', 'per_page']));
 
         return ApiResponse::resource(
             'Users retrieved successfully.',

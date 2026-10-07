@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\UserPortalAccessEnum;
 use App\Enums\UserRoleEnum;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -31,6 +32,7 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'role' => UserRoleEnum::HotelAdministrator->value,
+            'portal_access' => UserPortalAccessEnum::Admin->value,
             'is_active' => true,
             'remember_token' => Str::random(10),
         ];

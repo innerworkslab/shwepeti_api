@@ -2,6 +2,7 @@
 
 namespace App\Services\Users;
 
+use App\Enums\UserPortalAccessEnum;
 use App\Http\Resources\Users\UserResource;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -32,6 +33,10 @@ class UserService
                 'role' => $data['role'],
                 'is_active' => $data['is_active'] ?? true,
             ];
+
+            if (array_key_exists('portal_access', $data) || blank($data['id'] ?? null)) {
+                $values['portal_access'] = $data['portal_access'] ?? UserPortalAccessEnum::Admin->value;
+            }
 
             if (! empty($data['password'])) {
                 $values['password'] = $data['password'];

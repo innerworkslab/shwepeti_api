@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureUserPortalAccess;
 use App\Http\Middleware\EnsureUserRole;
 use App\Support\ApiResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'portal' => EnsureUserPortalAccess::class,
             'role' => EnsureUserRole::class,
         ]);
     })

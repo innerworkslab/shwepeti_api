@@ -2,6 +2,7 @@
 
 namespace App\Services\Auth;
 
+use App\Enums\UserPortalAccessEnum;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,7 @@ class AuthService
     /**
      * @return array{token: string, user: User}
      */
-    public function login(array $credentials, Request $request): array
+    public function login(array $credentials, Request $request, ?UserPortalAccessEnum $portal = null): array
     {
         $user = User::query()->where('email', $credentials['email'])->first();
 
@@ -26,6 +27,12 @@ class AuthService
         if (! $user->is_active) {
             throw ValidationException::withMessages([
                 'email' => ['This account is inactive.'],
+            ]);
+        }
+
+        if ($portal && ! $user->canAccessPortal($portal)) {
+            throw ValidationException::withMessages([
+                'email' => ['This account cannot access this portal.'],
             ]);
         }
 

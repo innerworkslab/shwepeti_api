@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1\Admin;
+namespace App\Http\Controllers\Api\V1\Pos;
 
 use App\Enums\UserPortalAccessEnum;
 use App\Http\Controllers\Controller;
@@ -17,7 +17,7 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
-        $result = $this->authService->login($request->validated(), $request, UserPortalAccessEnum::Admin);
+        $result = $this->authService->login($request->validated(), $request, UserPortalAccessEnum::Pos);
 
         return ApiResponse::success('Login successful.', [
             'token_type' => 'Bearer',

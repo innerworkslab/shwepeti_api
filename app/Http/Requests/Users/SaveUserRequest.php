@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Users;
 
+use App\Enums\UserPortalAccessEnum;
 use App\Enums\UserRoleEnum;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -31,6 +32,7 @@ class SaveUserRequest extends FormRequest
             ],
             'password' => [Rule::requiredIf(fn () => blank($this->input('id'))), 'nullable', 'string', 'min:8'],
             'role' => ['required', Rule::in(UserRoleEnum::values())],
+            'portal_access' => ['sometimes', Rule::in(UserPortalAccessEnum::values())],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
