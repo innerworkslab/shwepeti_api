@@ -35,6 +35,11 @@ class Room extends Model implements AuditableContract
         return $this->hasMany(RoomBed::class);
     }
 
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class);
+    }
+
     /**
      * @param  Builder<Room>  $query
      * @param  array<string, mixed>  $filters

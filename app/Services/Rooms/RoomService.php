@@ -2,6 +2,8 @@
 
 namespace App\Services\Rooms;
 
+use App\Enums\BookingStatusEnum;
+use App\Enums\RoomStatusEnum;
 use App\Http\Resources\Rooms\RoomResource;
 use App\Models\Room;
 use App\Models\User;
@@ -25,6 +27,25 @@ class RoomService
         return $query->paginate((int) ($filters['per_page'] ?? 15));
     }
 
+    public function posPaginate(array $filters = []): LengthAwarePaginator|Collection
+    {
+        $query = Room::query()
+            ->with([
+                'roomCategory',
+                'bookings' => fn ($query) => $query
+                    ->whereIn('status', [BookingStatusEnum::Reserved->value, BookingStatusEnum::CheckedIn->value])
+                    ->latest(),
+            ])
+            ->filter($filters)
+            ->latest();
+
+        if (! isset($filters['page'])) {
+            return $query->get();
+        }
+
+        return $query->paginate((int) ($filters['per_page'] ?? 15));
+    }
+
     public function save(array $data, ?User $actor = null): RoomResource
     {
         return DB::transaction(function () use ($data, $actor): RoomResource {
@@ -32,13 +53,12 @@ class RoomService
                 'name' => $data['name'],
                 'room_category_id' => $data['room_category_id'],
                 'price' => $data['price'],
-                'status' => $data['status'],
+                'status' => $data['status'] ?? RoomStatusEnum::Available->value,
             ];
 
             if ($actor) {
                 $values[filled($data['id'] ?? null) ? 'updated_by' : 'created_by'] = $actor->id;
             }
-
             $room = Room::query()->updateOrCreate(['id' => $data['id'] ?? null], $values);
 
             $bedTypes = collect($data['room_beds'])->pluck('bed_type')->all();

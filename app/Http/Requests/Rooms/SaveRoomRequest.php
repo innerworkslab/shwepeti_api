@@ -34,7 +34,7 @@ class SaveRoomRequest extends FormRequest
                 Rule::exists('room_categories', 'id')->where(fn ($query) => $query->where('is_active', true)->whereNull('deleted_at')),
             ],
             'price' => ['required', 'numeric', 'min:0'],
-            'status' => ['required', Rule::in(RoomStatusEnum::values())],
+            // 'status' => ['required', Rule::in(RoomStatusEnum::values())],
             'room_beds' => ['required', 'array', 'min:1'],
             'room_beds.*.bed_type' => ['required', 'string', Rule::in(RoomBedTypeEnum::values()), 'distinct'],
             'room_beds.*.qty' => ['required', 'integer', 'min:1'],

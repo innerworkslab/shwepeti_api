@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\AssetCategory;
+use App\Models\Booking;
+use App\Models\BookingPayment;
 use App\Models\Cashbook;
 use App\Models\CashbookTransaction;
 use App\Models\FixedAsset;
@@ -51,6 +53,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Relation::enforceMorphMap([
             'user' => User::class,
+            'booking' => Booking::class,
+            'booking_payment' => BookingPayment::class,
             'asset_category' => AssetCategory::class,
             'fixed_asset' => FixedAsset::class,
             'cashbook' => Cashbook::class,
