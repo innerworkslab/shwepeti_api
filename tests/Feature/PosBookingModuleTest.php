@@ -6,6 +6,7 @@ use App\Enums\BookingChargeTypeEnum;
 use App\Enums\BookingPaymentTypeEnum;
 use App\Enums\BookingStatusEnum;
 use App\Enums\BookingTypeEnum;
+use App\Enums\CashbookTransactionTypeEnum;
 use App\Enums\CashbookTypeEnum;
 use App\Enums\PaymentMethodEnum;
 use App\Enums\RoomStatusEnum;
@@ -154,6 +155,18 @@ class PosBookingModuleTest extends TestCase
             'payment_method' => PaymentMethodEnum::Cash->value,
             'amount' => 40,
         ]);
+
+        $this->assertDatabaseHas('cashbook_transactions', [
+            'cashbook_id' => $cashbook->id,
+            'transaction_type' => CashbookTransactionTypeEnum::Income->value,
+            'amount' => 40,
+            'balance_after' => 40,
+            'reference_type' => 'booking_payment',
+        ]);
+        $this->assertDatabaseHas('cashbooks', [
+            'id' => $cashbook->id,
+            'current_balance' => 40,
+        ]);
     }
 
     public function test_it_creates_a_session_booking_using_session_rate(): void
@@ -300,6 +313,18 @@ class PosBookingModuleTest extends TestCase
             'payment_method' => PaymentMethodEnum::Cash->value,
             'amount' => 100,
         ]);
+
+        $this->assertDatabaseHas('cashbook_transactions', [
+            'cashbook_id' => $cashbook->id,
+            'transaction_type' => CashbookTransactionTypeEnum::Income->value,
+            'amount' => 100,
+            'balance_after' => 100,
+            'reference_type' => 'booking_payment',
+        ]);
+        $this->assertDatabaseHas('cashbooks', [
+            'id' => $cashbook->id,
+            'current_balance' => 100,
+        ]);
     }
 
     public function test_it_adds_partial_payment_to_checked_in_booking(): void
@@ -340,6 +365,18 @@ class PosBookingModuleTest extends TestCase
             'payment_type' => BookingPaymentTypeEnum::Partial->value,
             'payment_method' => PaymentMethodEnum::KPay->value,
             'amount' => 40,
+        ]);
+
+        $this->assertDatabaseHas('cashbook_transactions', [
+            'cashbook_id' => $cashbook->id,
+            'transaction_type' => CashbookTransactionTypeEnum::Income->value,
+            'amount' => 40,
+            'balance_after' => 40,
+            'reference_type' => 'booking_payment',
+        ]);
+        $this->assertDatabaseHas('cashbooks', [
+            'id' => $cashbook->id,
+            'current_balance' => 40,
         ]);
     }
 

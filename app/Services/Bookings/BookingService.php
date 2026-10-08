@@ -6,6 +6,7 @@ use App\Enums\BookingChargeTypeEnum;
 use App\Enums\BookingPaymentTypeEnum;
 use App\Enums\BookingStatusEnum;
 use App\Enums\BookingTypeEnum;
+use App\Enums\CashbookTransactionTypeEnum;
 use App\Enums\FoodOrderStatusEnum;
 use App\Enums\RoomStatusEnum;
 use App\Enums\ServiceOrderStatusEnum;
@@ -14,6 +15,7 @@ use App\Models\Booking;
 use App\Models\BookingPayment;
 use App\Models\Room;
 use App\Models\User;
+use App\Services\CashbookTransactions\CashbookTransactionService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -22,6 +24,8 @@ use Illuminate\Validation\ValidationException;
 
 class BookingService
 {
+    public function __construct(private readonly CashbookTransactionService $cashbookTransactionService) {}
+
     public function paginate(array $filters = []): LengthAwarePaginator|Collection
     {
         $query = Booking::query()
@@ -106,17 +110,15 @@ class BookingService
             ]);
 
             if ($depositAmount > 0) {
-                BookingPayment::query()->create([
+                $this->recordPayment([
                     'booking_id' => $booking->id,
-                    'cashbook_id' => data_get($data, 'deposit.cashbook_id'),
-                    'payment_no' => $this->nextPaymentNo(),
-                    'payment_type' => BookingPaymentTypeEnum::Deposit,
-                    'payment_method' => data_get($data, 'deposit.payment_method'),
+                    'cashbook_id' => (int) data_get($data, 'deposit.cashbook_id'),
+                    'payment_type' => BookingPaymentTypeEnum::Deposit->value,
+                    'payment_method' => (string) data_get($data, 'deposit.payment_method'),
                     'amount' => $depositAmount,
                     'paid_at' => data_get($data, 'deposit.paid_at') ? Carbon::parse(data_get($data, 'deposit.paid_at')) : now(),
                     'note' => data_get($data, 'deposit.note'),
-                    'created_by' => $actor?->id,
-                ]);
+                ], $actor);
             }
 
             $room->update([
@@ -205,17 +207,15 @@ class BookingService
                 ]);
             }
 
-            BookingPayment::query()->create([
+            $this->recordPayment([
                 'booking_id' => $booking->id,
                 'cashbook_id' => $data['cashbook_id'],
-                'payment_no' => $this->nextPaymentNo(),
-                'payment_type' => BookingPaymentTypeEnum::Checkout,
+                'payment_type' => BookingPaymentTypeEnum::Checkout->value,
                 'payment_method' => $data['payment_method'],
                 'amount' => $amount,
                 'paid_at' => isset($data['paid_at']) ? Carbon::parse($data['paid_at']) : now(),
                 'note' => $data['note'] ?? null,
-                'created_by' => $actor?->id,
-            ]);
+            ], $actor);
 
             $paidAmount = (float) $booking->paid_amount + $amount;
 
@@ -260,17 +260,15 @@ class BookingService
                 ]);
             }
 
-            BookingPayment::query()->create([
+            $this->recordPayment([
                 'booking_id' => $booking->id,
                 'cashbook_id' => $data['cashbook_id'],
-                'payment_no' => $this->nextPaymentNo(),
-                'payment_type' => BookingPaymentTypeEnum::Partial,
+                'payment_type' => BookingPaymentTypeEnum::Partial->value,
                 'payment_method' => $data['payment_method'],
                 'amount' => $amount,
                 'paid_at' => isset($data['paid_at']) ? Carbon::parse($data['paid_at']) : now(),
                 'note' => $data['note'] ?? null,
-                'created_by' => $actor?->id,
-            ]);
+            ], $actor);
 
             $paidAmount = (float) $booking->paid_amount + $amount;
 
@@ -364,5 +362,50 @@ class BookingService
     private function nextPaymentNo(): string
     {
         return 'BP-'.now()->format('YmdHis').'-'.str_pad((string) random_int(1, 999), 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * @param  array{
+     *     booking_id:int,
+     *     cashbook_id:int,
+     *     payment_type:string,
+     *     payment_method:string,
+     *     amount:float,
+     *     paid_at:Carbon,
+     *     note:?string
+     * }  $data
+     */
+    private function recordPayment(array $data, ?User $actor = null): BookingPayment
+    {
+        $payment = BookingPayment::query()->create([
+            'booking_id' => $data['booking_id'],
+            'cashbook_id' => $data['cashbook_id'],
+            'payment_no' => $this->nextPaymentNo(),
+            'payment_type' => $data['payment_type'],
+            'payment_method' => $data['payment_method'],
+            'amount' => $data['amount'],
+            'paid_at' => $data['paid_at'],
+            'note' => $data['note'],
+            'created_by' => $actor?->id,
+        ]);
+
+        $this->cashbookTransactionService->post([
+            'cashbook_id' => $payment->cashbook_id,
+            'transaction_type' => CashbookTransactionTypeEnum::Income->value,
+            'amount' => $payment->amount,
+            'transaction_date' => $payment->paid_at->format('Y-m-d H:i:s'),
+            'remark' => $this->paymentRemark($payment),
+        ], $actor, $payment);
+
+        return $payment;
+    }
+
+    private function paymentRemark(BookingPayment $payment): string
+    {
+        $type = $payment->payment_type instanceof BookingPaymentTypeEnum
+            ? $payment->payment_type->value
+            : (string) $payment->payment_type;
+
+        return "Booking payment {$payment->payment_no} ({$type})";
     }
 }
