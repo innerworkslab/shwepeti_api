@@ -2,18 +2,24 @@
 
 ## 1. Project Overview
 
-Shwe Peti is a Laravel backend API application for managing hotel administration data. The system is designed for an internal admin web dashboard and exposes versioned REST APIs secured with Laravel Sanctum authentication.
+Shwe Peti is a Laravel backend API application for managing hotel administration and front-office POS operations. The system exposes separate Admin Portal and POS Portal REST APIs secured with one Laravel Sanctum user system.
 
-The current release focuses on internal staff accounts, room setup, inventory setup, item master data, unit conversions, inventory stock movements, cashbook management, fixed asset management, audit logs, soft deletes where needed, and consistent API responses.
+The current release focuses on internal staff accounts, portal-based access control, room setup, booking and check-in/check-out flows, booking payments, food ordering, amenity and laundry service orders, inventory setup, item master data, unit conversions, inventory stock movements, cashbook management, fixed asset management, audit logs, soft deletes where needed, and consistent API responses.
 
 ## 2. Goals
 
-- Provide a secure Laravel backend API for an internal hotel administration dashboard.
-- Manage internal staff users and role-based access.
+- Provide secure Laravel backend APIs for the internal Admin Portal and POS Portal.
+- Manage internal staff users with role-based access and portal access control.
 - Manage room categories with activation control.
 - Manage rooms and their operational statuses.
+- Manage front-office room availability, reservations, walk-in check-ins, check-outs, and cancellations.
+- Support day-based and session-based booking charges.
+- Support optional reservation deposits, partial payments, and final checkout payments.
+- Support POS food orders from menu records.
+- Support POS amenities and laundry service orders using item categories.
 - Manage unit groups, units, item categories, items, and item unit conversions.
 - Manage warehouses and inventory stock transactions.
+- Manage menu categories, menus, menu availability, and menu recipes for food ordering.
 - Maintain inventory ledgers and stock balances from posted stock documents.
 - Manage hierarchical asset categories and fixed asset purchases.
 - Record each posted fixed asset purchase as exactly one cashbook expense transaction.
@@ -26,18 +32,35 @@ The current release focuses on internal staff accounts, room setup, inventory se
 ### In Scope
 
 - Internal staff authentication using Laravel Sanctum.
+- One user table and one authentication system for both Admin and POS portal access.
+- Portal access values using `UserPortalAccessEnum`: `admin`, `pos`, and `both`.
 - API versioning, starting with `v1`.
 - User management for internal staff.
 - Role assignment for supported hotel administrator roles.
+- Separate Admin Portal and POS Portal route files.
 - Room category CRUD.
 - Room CRUD.
 - Room bed setup using `RoomBed` records and `RoomBedTypeEnum`.
 - Room status management using `RoomStatusEnum`.
+- POS room list, available-room list, and room detail APIs.
+- Booking dashboard calendar data by date range, room category, room, availability, and booking bars.
+- Booking creation for reservations and walk-ins.
+- Booking status workflows for reserved, checked-in, checked-out, and cancelled bookings.
+- Booking type values using `BookingTypeEnum`: `reservation` and `walk_in`.
+- Booking charge type values using `BookingChargeTypeEnum`: `day` and `session`.
+- Optional reservation deposit capture.
+- Partial booking payments before checkout.
+- Checkout with final payment and room status update.
+- Food menu list and food order workflows.
+- Amenity and laundry item list and service order workflows.
+- One `service_orders` table for amenities and laundry.
 - Unit group CRUD and active toggle.
 - Unit CRUD and active toggle.
 - Item category CRUD and active toggle.
 - Item CRUD, nested item unit conversion sync, and active toggle.
 - Item unit conversion CRUD and active toggle.
+- Menu category CRUD and active toggle.
+- Menu CRUD, availability toggle, active toggle, and recipe sync.
 - Warehouse CRUD and active toggle.
 - Stock in, stock out, inventory transfer, and inventory adjustment documents.
 - Draft, posted, and cancelled status workflows for inventory documents.
@@ -57,9 +80,6 @@ The current release focuses on internal staff accounts, room setup, inventory se
 
 - Public guest/customer registration.
 - Public booking website.
-- Reservation/booking workflows.
-- Payment processing.
-- Restaurant ordering.
 - Housekeeping task assignment.
 - Multi-branch hotel support.
 - Mobile app implementation.
@@ -74,11 +94,19 @@ These excluded areas may be added in later API versions or feature phases.
 - Auditing: `owen-it/laravel-auditing`
 - API Style: REST JSON API
 - API Versioning: URI-based versioning, for example `/api/v1/...`
-- Backend Type: API-only backend for an admin web dashboard
+- Backend Type: API-only backend for Admin Portal and POS Portal clients
 
 ## 5. User Roles
 
-The system is currently for internal staff only. The following roles are required:
+The system is currently for internal staff only. Staff users are stored in one `users` table and may be allowed into the Admin Portal, the POS Portal, or both.
+
+Portal access values:
+
+- `admin` - may authenticate to Admin Portal endpoints.
+- `pos` - may authenticate to POS Portal endpoints.
+- `both` - may authenticate to both Admin and POS Portal endpoints.
+
+The following roles are required:
 
 1. Hotel Administrator
 2. Front Office Administrator
@@ -92,7 +120,7 @@ The system is currently for internal staff only. The following roles are require
 - Hotel Administrator: Full administrative access across users, room categories, rooms, inventory setup, items, item conversions, audit logs, and system settings.
 - Front Office Administrator: Manage room availability and day-to-day room status changes.
 - Reservation Administrator: View and update room availability/status related to reservation operations.
-- Restaurant Administrator: Internal role reserved for future restaurant workflows.
+- Restaurant Administrator: Manage POS food order workflows where permitted.
 - Customer Service Administrator: View room and category information to support guest service workflows.
 - Inventory Administrator: Manage inventory setup, item master data, stock documents, stock balances, and ledgers where permitted.
 
@@ -103,6 +131,9 @@ The system is currently for internal staff only. The following roles are require
 - Staff users must log in using credentials.
 - Authentication must use Laravel Sanctum token-based authentication.
 - API clients must send authenticated requests with a bearer token.
+- Admin Portal login uses `POST /api/v1/admin/login` and protected Admin Portal routes require `portal:admin`.
+- POS Portal login uses `POST /api/v1/pos/login` and protected POS Portal routes require `portal:pos`.
+- Users with `portal_access = both` may use both portals with the same account.
 - The system must support logout by revoking the current access token.
 - The system should support a `me` endpoint to return the authenticated staff profile.
 - Guest/customer authentication is excluded from the initial release.
@@ -113,6 +144,7 @@ The system is currently for internal staff only. The following roles are require
 - Hotel Administrators can view a paginated list of users.
 - Hotel Administrators can view user details.
 - Hotel Administrators can update user profile fields and role assignment.
+- Hotel Administrators can assign `portal_access` as `admin`, `pos`, or `both`.
 - Hotel Administrators can deactivate users.
 - Hotel Administrators can soft delete users.
 - Soft-deleted users should be restorable by Hotel Administrators.
@@ -125,6 +157,7 @@ Recommended user fields:
 - `email`
 - `password`
 - `role`
+- `portal_access`
 - `is_active`
 - `email_verified_at`
 - `last_login_at`
@@ -300,6 +333,12 @@ Seeded item categories:
 - Beverages: Soft Drink, Water, Juice, Coffee
 - Consumables: Tissue, Takeaway, Packaging, Cleaning
 - Accessories: Room Accessories, Kitchen Accessories, Equipment Accessories
+- Services: Amenities, Laundry
+
+Seeded POS/service items:
+
+- Amenities: Extra Towel, Extra Blanket, Guest Amenity Kit
+- Laundry: Laundry Shirt, Laundry Pants, Laundry Dress
 
 ### 6.6 Item Management
 
@@ -356,7 +395,57 @@ Functional behavior:
 - Normal item list and item detail responses do not include stock balance fields.
 - Warehouse-specific item lists include `balance_quantity` and a `balance` object with the item's stock unit.
 
-### 6.7 Inventory Transactions
+### 6.7 Menu Management
+
+Menus define the food items that can be ordered from POS food order workflows.
+
+Menu category fields:
+
+- `id`
+- `name`
+- `slug`
+- `code`
+- `description`
+- `sort_order`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Menu fields:
+
+- `id`
+- `menu_category_id`
+- `name`
+- `code`
+- `description`
+- `price`
+- `cost_price`
+- `image_url`
+- `is_available`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Menu recipe fields:
+
+- `id`
+- `menu_id`
+- `item_id`
+- `unit_id`
+- `quantity`
+- `base_quantity`
+- `remark`
+
+Functional behavior:
+
+- Menu categories can be listed, searched, created, updated, shown, deleted, and toggled active/inactive.
+- Menus can be listed, searched, filtered by category, filtered by active state, filtered by availability, created, updated, shown, deleted, toggled active/inactive, and toggled available/unavailable.
+- Menus can accept nested `recipes` in the save payload.
+- Menu recipes connect menus to inventory items and units for future stock usage logic.
+- POS menu list returns active and available menus only.
+- Create and update use one `POST` endpoint with optional `id`.
+
+### 6.8 Inventory Transactions
 
 Inventory transactions are represented by draft documents that become stock-affecting only when their status changes to `posted`.
 
@@ -568,7 +657,7 @@ Warehouse-specific item list response:
 }
 ```
 
-### 6.8 Audit Logs
+### 6.9 Audit Logs
 
 The system records audit logs using `owen-it/laravel-auditing`.
 
@@ -662,7 +751,7 @@ Summary examples:
 - `Deleted room: Room 101`
 - `Restored user: front@example.com`
 
-### 6.9 Date and Time Response Format
+### 6.10 Date and Time Response Format
 
 All resource date-time fields must be serialized in the application timezone, `Asia/Yangon`, using this format:
 
@@ -678,7 +767,7 @@ Example:
 
 The database date-time values may remain in the configured database/application timezone, but API resources must not return UTC `Z` ISO strings.
 
-### 6.10 Activity History
+### 6.11 Activity History
 
 Activity history is currently represented through audit logs. Separate entity activity endpoints are not implemented yet.
 
@@ -709,7 +798,7 @@ Activity history must include:
 - New values where applicable
 - Timestamp
 
-### 6.11 Asset and Cashbook Management
+### 6.12 Asset and Cashbook Management
 
 Asset categories organize fixed assets and may be nested through an optional `parent_id`.
 
@@ -776,6 +865,96 @@ Asset category seed data:
 
 - `AssetCategorySeeder` is idempotent and creates 18 active categories.
 - Parent groups are Property, Furniture & Fixtures, Equipment, and Vehicles.
+
+### 6.13 POS Booking, Payment, Food, and Service Operations
+
+POS Portal operations are used by front-office staff after authentication through `/api/v1/pos/login`.
+
+Booking fields:
+
+- `booking_no`, generated when omitted
+- `room_id`
+- `booking_type`: `reservation` or `walk_in`
+- `charge_type`: `day` or `session`
+- guest name, phone, email, NRC, and address fields
+- `expected_check_in_at`
+- `expected_check_out_at`
+- `checked_in_at`, nullable
+- `checked_out_at`, nullable
+- `status`: `reserved`, `checked_in`, `checked_out`, or `cancelled`
+- `guest_count`
+- `room_rate`
+- `session_hours`, required when `charge_type = session`
+- `session_rate`, required when `charge_type = session`
+- `subtotal`, `discount_amount`, `tax_amount`, `total_amount`, `paid_amount`, and `balance_amount`
+- `note`
+
+Booking rules:
+
+- Reservations create a `reserved` booking and set the room status to `reserved`.
+- Walk-in bookings create a `checked_in` booking immediately, set `checked_in_at` to the current time, record the check-in user, and set the room status to `occupied`.
+- `check_in_now = true` may be sent for walk-in clients, but walk-in bookings are checked in by default.
+- Day bookings calculate from the room rate and expected stay dates.
+- Session bookings require `session_hours`, `session_rate`, and `expected_check_out_at`.
+- `session_rate` is the total session/package price for the session booking.
+- Reserved bookings may be checked in through the check-in endpoint, which sets the room to `occupied`.
+- Checked-in bookings may be checked out through the checkout endpoint.
+- Checkout with payment requires the submitted amount to cover the current effective balance.
+- Checked-out bookings set the room status to `dirty`.
+- Bookings may be cancelled only while business rules allow cancellation; cancellation releases the room back to `available`.
+
+Payment rules:
+
+- Booking payments are stored in `booking_payments`.
+- Payment types are `deposit`, `partial`, `checkout`, and `refund`.
+- Payment methods are `cash`, `kpay`, `wavepay`, `bank_transfer`, and `card`.
+- `cashbook_id` is required for recorded booking payments.
+- Reservation deposits are optional and may be included in the booking creation payload as `deposit`.
+- Deposits are allowed only for `booking_type = reservation`.
+- Deposit amount cannot exceed the booking total.
+- Partial payments are allowed only for checked-in bookings and cannot exceed the current effective balance.
+- Checkout payment is allowed only for checked-in bookings and must cover the current effective balance.
+- Booking payable amount includes room or session charges plus non-cancelled food orders and non-cancelled service orders.
+
+Food order rules:
+
+- Food orders use menu records and are tied to a checked-in booking.
+- Food order creation requires `booking_id`; the API derives the room from the booking.
+- Food orders are allowed only when the booking is `checked_in` and the room is `occupied`.
+- Food order statuses are `pending`, `preparing`, `served`, and `cancelled`.
+- Allowed food status transitions are `pending -> preparing`, `pending -> cancelled`, and `preparing -> served`.
+- Food orders cannot be cancelled after they are preparing or served.
+
+Service order rules:
+
+- Amenities and laundry use one `service_orders` table with type `amenity` or `laundry`.
+- Service order creation requires `booking_id`; the API derives the room from the booking.
+- Service orders are allowed only when the booking is `checked_in` and the room is `occupied`.
+- Amenity service order items must belong to the `AMENITIES` item category.
+- Laundry service order items must belong to the `LAUNDRY` item category.
+- Service order statuses are `pending`, `processing`, `completed`, and `cancelled`.
+- Allowed service status transitions are `pending -> processing`, `pending -> cancelled`, and `processing -> completed`.
+- Service orders cannot be cancelled after processing or completion.
+
+Booking detail responses:
+
+- `GET /api/v1/pos/bookings/{booking}` includes room, payments, food orders, and service orders.
+- Calculated response totals include `room_total_amount`, `food_order_amount`, `service_order_amount`, `order_amount`, `grand_total_amount`, and `balance_amount`.
+
+Booking dashboard rules:
+
+- The dashboard endpoint accepts `start_date` and `end_date`.
+- Optional filters include `room_category_id` and `status`.
+- The response groups rooms by category, returns date columns, availability counts, and booking bars suitable for a calendar-style room dashboard.
+- Booking overlap logic should include bookings whose expected stay intersects the requested date range.
+
+Core seeders:
+
+- `UserSeeder` creates admin, POS, and both-portal users for local testing.
+- `RoomCategorySeeder` creates Standard, Deluxe, and Suite room categories.
+- `RoomSeeder` creates sample rooms 101, 102, 201, 202, and 301.
+- `ItemCategorySeeder` includes Amenities and Laundry service categories.
+- `ItemSeeder` includes sample amenity and laundry service items.
 
 ## 7. Non-Functional Requirements
 
@@ -870,6 +1049,7 @@ Pagination response should include metadata:
 | `email` | string | Unique |
 | `password` | string | Hashed |
 | `role` | string or enum | Internal staff role |
+| `portal_access` | string | `admin`, `pos`, or `both` |
 | `is_active` | boolean | Defaults to true |
 | `email_verified_at` | timestamp nullable | Optional |
 | `last_login_at` | timestamp nullable | Updated on login |
@@ -1274,7 +1454,139 @@ Unique index:
 | `created_at` | timestamp | Laravel default |
 | `updated_at` | timestamp | Laravel default |
 
-### 8.26 Relationships
+### 8.26 Menu Categories Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `name` | string | Menu category name |
+| `slug` | string | Unique slug |
+| `code` | string | Unique normalized code |
+| `description` | text nullable | Optional description |
+| `sort_order` | unsigned integer | Display order |
+| `is_active` | boolean | Active state |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.27 Menus Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `menu_category_id` | unsigned big integer | Foreign key to menu categories |
+| `name` | string | Menu item name |
+| `code` | string | Unique menu code |
+| `description` | text nullable | Optional description |
+| `price` | decimal(18, 2) | Selling price |
+| `cost_price` | decimal(18, 2) nullable | Optional cost price |
+| `image_url` | string nullable | Optional image URL |
+| `is_available` | boolean | POS availability |
+| `is_active` | boolean | Active state |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.28 Menu Recipes Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `menu_id` | unsigned big integer | Foreign key to menus |
+| `item_id` | unsigned big integer | Foreign key to inventory items |
+| `unit_id` | unsigned big integer | Foreign key to units |
+| `quantity` | decimal(18, 6) | Recipe quantity |
+| `base_quantity` | decimal(18, 6) | Quantity converted to item stock unit |
+| `remark` | text nullable | Optional remark |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.29 Bookings Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `booking_no` | string | Unique generated booking number |
+| `room_id` | unsigned big integer | Foreign key to rooms |
+| `booking_type` | string | `reservation` or `walk_in` |
+| `charge_type` | string | `day` or `session` |
+| `guest_name` | string | Guest display name |
+| `guest_phone` | string nullable | Guest phone |
+| `guest_email` | string nullable | Guest email |
+| `expected_check_in_at` | date-time | Planned check-in |
+| `expected_check_out_at` | date-time nullable | Required for session bookings |
+| `checked_in_at` | date-time nullable | Actual check-in |
+| `checked_out_at` | date-time nullable | Actual check-out |
+| `status` | string | `reserved`, `checked_in`, `checked_out`, or `cancelled` |
+| `guest_count` | integer | Number of guests |
+| `room_rate` | decimal(18, 2) | Room rate snapshot |
+| `session_hours` | integer nullable | Required for session charge |
+| `session_rate` | decimal(18, 2) nullable | Required for session charge |
+| `subtotal` | decimal(18, 2) | Booking room/session subtotal |
+| `discount_amount` | decimal(18, 2) | Discount amount |
+| `tax_amount` | decimal(18, 2) | Tax amount |
+| `total_amount` | decimal(18, 2) | Stored room/session total |
+| `paid_amount` | decimal(18, 2) | Stored paid amount |
+| `balance_amount` | decimal(18, 2) | Stored booking balance |
+| `note` | text nullable | Internal note |
+| `created_by` | unsigned big integer nullable | User who created booking |
+| `checked_in_by` | unsigned big integer nullable | User who checked in |
+| `checked_out_by` | unsigned big integer nullable | User who checked out |
+| `cancelled_by` | unsigned big integer nullable | User who cancelled |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.30 Booking Payments Table
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned big integer | Primary key |
+| `booking_id` | unsigned big integer | Foreign key to bookings |
+| `cashbook_id` | unsigned big integer | Foreign key to cashbooks |
+| `payment_no` | string | Unique generated payment number |
+| `payment_type` | string | `deposit`, `partial`, `checkout`, or `refund` |
+| `payment_method` | string | `cash`, `kpay`, `wavepay`, `bank_transfer`, or `card` |
+| `amount` | decimal(18, 2) | Payment amount |
+| `paid_at` | date-time | Payment date and time |
+| `note` | text nullable | Payment note |
+| `created_by` | unsigned big integer nullable | User who recorded payment |
+| `created_at` | timestamp | Laravel default |
+| `updated_at` | timestamp | Laravel default |
+
+### 8.31 Food Orders and Food Order Items Tables
+
+Food orders store booking-level menu orders. Food order items store menu snapshots, quantity, unit price, line total, and note values.
+
+Core food order fields:
+
+- `booking_id`
+- `room_id`
+- `order_no`
+- `status`
+- `subtotal`
+- `discount_amount`
+- `tax_amount`
+- `total_amount`
+- `note`
+- `created_by`
+
+### 8.32 Service Orders and Service Order Items Tables
+
+Service orders store amenity and laundry requests in one table. Service order items store item snapshots, quantity, unit price, line total, and note values.
+
+Core service order fields:
+
+- `booking_id`
+- `room_id`
+- `order_no`
+- `type`
+- `status`
+- `subtotal`
+- `discount_amount`
+- `tax_amount`
+- `total_amount`
+- `note`
+- `created_by`
+
+### 8.33 Relationships
 
 - User has many created room categories.
 - User has many updated room categories.
@@ -1299,6 +1611,10 @@ Unique index:
 - Item unit conversion belongs to item.
 - Item unit conversion belongs to from unit.
 - Item unit conversion belongs to to unit.
+- Menu category has many menus.
+- Menu belongs to menu category.
+- Menu has many menu recipes and food order items.
+- Menu recipe belongs to menu, item, and unit.
 - Warehouse has many stock documents and stock balances.
 - Stock in belongs to warehouse and has many stock in items.
 - Stock out belongs to warehouse and has many stock out items.
@@ -1311,6 +1627,15 @@ Unique index:
 - Asset category has many child asset categories and fixed assets.
 - Fixed asset belongs to an asset category, cashbook, and creator.
 - Fixed asset has one polymorphically linked cashbook transaction after posting.
+- User has many bookings, booking payments, food orders, and service orders.
+- Room has many bookings, food orders, and service orders.
+- Booking belongs to room and has many booking payments.
+- Booking has many food orders and service orders.
+- Booking payment belongs to booking, cashbook, and creator.
+- Food order belongs to booking and room and has many food order items.
+- Food order item belongs to food order and menu.
+- Service order belongs to booking and room and has many service order items.
+- Service order item belongs to service order and item.
 - Audit belongs to user.
 - Audit morphs to auditable entity.
 
@@ -1319,7 +1644,8 @@ Unique index:
 Base prefix:
 
 ```text
-/api/v1/admin
+Admin Portal: /api/v1/admin
+POS Portal: /api/v1/pos
 ```
 
 Authentication header:
@@ -1336,6 +1662,8 @@ Accept: application/json
 | `POST` | `/api/v1/admin/login` | Log in staff user and issue Sanctum token |
 | `POST` | `/api/v1/admin/logout` | Revoke current token |
 | `GET` | `/api/v1/admin/me` | Get authenticated user profile |
+
+Admin protected routes require an authenticated user with `portal_access = admin` or `portal_access = both`.
 
 ### 9.2 User Endpoints
 
@@ -1420,7 +1748,28 @@ Accept: application/json
 | `DELETE` | `/api/v1/admin/item-unit-conversions/{item_unit_conversion}` | Delete item unit conversion |
 | `POST` | `/api/v1/admin/item-unit-conversions/{itemUnitConversion}/toggle-active` | Update conversion active state |
 
-### 9.10 Warehouse Endpoints
+### 9.10 Menu Category Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/menu-categories` | List menu categories |
+| `POST` | `/api/v1/admin/menu-categories` | Create or update menu category |
+| `GET` | `/api/v1/admin/menu-categories/{menu_category}` | Show menu category |
+| `DELETE` | `/api/v1/admin/menu-categories/{menu_category}` | Delete menu category |
+| `POST` | `/api/v1/admin/menu-categories/{menuCategory}/toggle-active` | Update menu category active state |
+
+### 9.11 Menu Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/admin/menus` | List menus |
+| `POST` | `/api/v1/admin/menus` | Create or update menu and recipes |
+| `GET` | `/api/v1/admin/menus/{menu}` | Show menu |
+| `DELETE` | `/api/v1/admin/menus/{menu}` | Delete menu |
+| `POST` | `/api/v1/admin/menus/{menu}/toggle-active` | Update menu active state |
+| `POST` | `/api/v1/admin/menus/{menu}/toggle-available` | Update POS availability |
+
+### 9.12 Warehouse Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1430,7 +1779,7 @@ Accept: application/json
 | `DELETE` | `/api/v1/admin/warehouses/{warehouse}` | Delete warehouse |
 | `POST` | `/api/v1/admin/warehouses/{warehouse}/toggle-active` | Update warehouse active state |
 
-### 9.11 Stock In Endpoints
+### 9.13 Stock In Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1440,7 +1789,7 @@ Accept: application/json
 | `DELETE` | `/api/v1/admin/stock-ins/{stock_in}` | Delete draft stock in |
 | `POST` | `/api/v1/admin/stock-ins/{stockIn}/status` | Change draft stock in to posted or cancelled |
 
-### 9.12 Stock Out Endpoints
+### 9.14 Stock Out Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1450,7 +1799,7 @@ Accept: application/json
 | `DELETE` | `/api/v1/admin/stock-outs/{stock_out}` | Delete draft stock out |
 | `POST` | `/api/v1/admin/stock-outs/{stockOut}/status` | Change draft stock out to posted or cancelled |
 
-### 9.13 Inventory Transfer Endpoints
+### 9.15 Inventory Transfer Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1460,7 +1809,7 @@ Accept: application/json
 | `DELETE` | `/api/v1/admin/inventory-transfers/{inventory_transfer}` | Delete draft transfer |
 | `POST` | `/api/v1/admin/inventory-transfers/{inventoryTransfer}/status` | Change draft transfer to posted or cancelled |
 
-### 9.14 Inventory Adjustment Endpoints
+### 9.16 Inventory Adjustment Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1470,7 +1819,7 @@ Accept: application/json
 | `DELETE` | `/api/v1/admin/inventory-adjustments/{inventory_adjustment}` | Delete draft adjustment |
 | `POST` | `/api/v1/admin/inventory-adjustments/{inventoryAdjustment}/status` | Change draft adjustment to posted or cancelled |
 
-### 9.15 Inventory Ledger Endpoints
+### 9.17 Inventory Ledger Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1490,7 +1839,7 @@ Ledger filters:
 - `page`
 - `per_page`
 
-### 9.16 Inventory Stock Balance Endpoints
+### 9.18 Inventory Stock Balance Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1504,7 +1853,7 @@ Stock balance filters:
 - `page`
 - `per_page`
 
-### 9.17 Audit Endpoints
+### 9.19 Audit Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1522,7 +1871,7 @@ Audit filters:
 - `page`
 - `per_page`
 
-### 9.18 Cashbook Endpoints
+### 9.20 Cashbook Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1540,7 +1889,7 @@ Cashbook filters:
 - `page`
 - `per_page`
 
-### 9.19 Cashbook Transaction Endpoints
+### 9.21 Cashbook Transaction Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1558,7 +1907,7 @@ Cashbook transaction filters:
 - `page`
 - `per_page`
 
-### 9.20 Asset Category Endpoints
+### 9.22 Asset Category Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1588,7 +1937,7 @@ Create asset category payload example:
 }
 ```
 
-### 9.21 Fixed Asset Endpoints
+### 9.23 Fixed Asset Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -1648,9 +1997,163 @@ Cancel fixed asset payload:
 }
 ```
 
+### 9.24 POS Auth Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/v1/pos/login` | Log in POS staff user and issue Sanctum token |
+| `POST` | `/api/v1/pos/logout` | Revoke current token |
+| `GET` | `/api/v1/pos/me` | Get authenticated POS user profile |
+
+POS protected routes require an authenticated user with `portal_access = pos` or `portal_access = both`.
+
+### 9.25 POS Room Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/pos/rooms` | List rooms for POS |
+| `GET` | `/api/v1/pos/rooms/available` | List available rooms for booking |
+| `GET` | `/api/v1/pos/rooms/{room}` | Show POS room detail |
+
+### 9.26 POS Booking Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/pos/booking-dashboard` | Calendar-style room booking dashboard |
+| `GET` | `/api/v1/pos/bookings` | List POS bookings |
+| `POST` | `/api/v1/pos/bookings` | Create reservation or walk-in booking |
+| `GET` | `/api/v1/pos/bookings/{booking}` | Show booking with payments, food orders, service orders, and calculated totals |
+| `POST` | `/api/v1/pos/bookings/{booking}/payments` | Add partial payment |
+| `POST` | `/api/v1/pos/bookings/{booking}/check-in` | Check in a reserved booking |
+| `POST` | `/api/v1/pos/bookings/{booking}/checkout` | Check out with final payment |
+| `POST` | `/api/v1/pos/bookings/{booking}/check-out` | Legacy checkout without payment payload |
+| `POST` | `/api/v1/pos/bookings/{booking}/cancel` | Cancel booking |
+
+Reservation payload example with optional deposit:
+
+```json
+{
+  "booking_type": "reservation",
+  "charge_type": "day",
+  "room_id": 1,
+  "guest_name": "Mg Mg",
+  "guest_phone": "09123456789",
+  "expected_check_in_at": "2026-10-08 14:00:00",
+  "expected_check_out_at": "2026-10-09 12:00:00",
+  "guest_count": 2,
+  "discount_amount": 0,
+  "tax_amount": 0,
+  "note": "Deposit received",
+  "deposit": {
+    "cashbook_id": 1,
+    "payment_method": "cash",
+    "amount": 15000,
+    "paid_at": "2026-10-08 12:00:00",
+    "note": "Reservation deposit"
+  }
+}
+```
+
+Walk-in payload example:
+
+```json
+{
+  "booking_type": "walk_in",
+  "charge_type": "session",
+  "room_id": 1,
+  "guest_name": "Aye Aye",
+  "guest_phone": "09987654321",
+  "expected_check_in_at": "2026-10-08 10:00:00",
+  "expected_check_out_at": "2026-10-08 14:00:00",
+  "session_hours": 4,
+  "session_rate": 40000,
+  "guest_count": 2,
+  "check_in_now": true,
+  "note": "Walk-in session"
+}
+```
+
+Partial payment payload example:
+
+```json
+{
+  "cashbook_id": 1,
+  "payment_method": "cash",
+  "amount": 15000,
+  "paid_at": "2026-10-08 12:00:00",
+  "note": "Partial payment"
+}
+```
+
+Checkout payload example:
+
+```json
+{
+  "cashbook_id": 1,
+  "payment_method": "cash",
+  "amount": 15000,
+  "paid_at": "2026-10-08 12:00:00",
+  "note": "Final payment"
+}
+```
+
+### 9.27 POS Food Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/pos/menus` | List active food menus |
+| `GET` | `/api/v1/pos/food-orders` | List food orders |
+| `POST` | `/api/v1/pos/food-orders` | Create food order for a checked-in booking |
+| `GET` | `/api/v1/pos/food-orders/{foodOrder}` | Show food order |
+| `POST` | `/api/v1/pos/food-orders/{foodOrder}/status` | Change food order status |
+
+Food order payload example:
+
+```json
+{
+  "booking_id": 1,
+  "note": "Serve to room",
+  "items": [
+    {
+      "menu_id": 1,
+      "qty": 2,
+      "note": "No chili"
+    }
+  ]
+}
+```
+
+### 9.28 POS Service Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/pos/items?category=amenity` | List amenity service items |
+| `GET` | `/api/v1/pos/items?category=laundry` | List laundry service items |
+| `GET` | `/api/v1/pos/service-orders` | List service orders |
+| `POST` | `/api/v1/pos/service-orders` | Create amenity or laundry service order |
+| `GET` | `/api/v1/pos/service-orders/{serviceOrder}` | Show service order |
+| `POST` | `/api/v1/pos/service-orders/{serviceOrder}/status` | Change service order status |
+
+Service order payload example:
+
+```json
+{
+  "booking_id": 1,
+  "type": "laundry",
+  "note": "Return before checkout",
+  "items": [
+    {
+      "item_id": 12,
+      "qty": 3,
+      "note": "Shirts"
+    }
+  ]
+}
+```
+
 ## 10. UI Overview
 
-The initial Laravel project is backend-only. The API is intended for an admin web dashboard built separately.
+The Laravel project is backend-only. The APIs are intended for Admin Portal and POS Portal clients built separately.
 
 Expected dashboard screens:
 
@@ -1683,6 +2186,14 @@ Expected dashboard screens:
 - Fixed asset detail screen with linked cashbook transaction and documents
 - Audit log screen
 - Audit log detail screen
+- POS login screen
+- POS room availability screen
+- POS booking dashboard calendar screen
+- POS reservation and walk-in booking screens
+- POS booking detail screen with room, payments, food orders, service orders, and totals
+- POS check-in, partial payment, checkout, and cancellation controls
+- POS food order screen
+- POS amenities and laundry service order screen
 
 Expected dashboard behaviors:
 
@@ -1834,6 +2345,59 @@ Expected dashboard behaviors:
 3. API validates that the fixed asset is still draft.
 4. API changes the status to `cancelled` without creating a cashbook transaction or changing the cashbook balance.
 
+### 11.14 POS Reservation With Optional Deposit
+
+1. POS user selects an available room and submits a reservation booking.
+2. API validates room availability, guest data, booking type, charge type, expected dates, and optional deposit payload.
+3. API creates a booking with `status = reserved`.
+4. API changes the room status to `reserved`.
+5. If a deposit is included, API validates the active cashbook and records a `deposit` booking payment.
+6. API updates paid and balance amounts and returns the booking.
+
+### 11.15 POS Walk-In Booking
+
+1. POS user submits a booking with `booking_type = walk_in`.
+2. API validates the room is available.
+3. API creates the booking with `status = checked_in`.
+4. API sets `checked_in_at` to the current time and records the check-in user.
+5. API changes the room status to `occupied`.
+6. API returns the checked-in booking.
+
+### 11.16 POS Partial Payment
+
+1. POS user opens a checked-in booking.
+2. User submits `cashbook_id`, `payment_method`, `amount`, optional `paid_at`, and optional `note`.
+3. API validates the booking is checked in and the amount does not exceed the effective balance.
+4. API records a `partial` booking payment.
+5. API recalculates paid and balance amounts and returns the booking.
+
+### 11.17 POS Checkout With Payment
+
+1. POS user opens a checked-in booking.
+2. API calculates effective payable amount from room/session charge plus non-cancelled food and service orders.
+3. User submits final payment data.
+4. API validates the amount covers the effective balance.
+5. API records a `checkout` booking payment.
+6. API changes booking status to `checked_out`, sets `checked_out_at`, and records the checkout user.
+7. API changes room status to `dirty`.
+8. API returns the checked-out booking with calculated totals.
+
+### 11.18 POS Food Order
+
+1. POS user selects a checked-in booking.
+2. User submits menu items and quantities.
+3. API validates the booking is `checked_in` and the room is `occupied`.
+4. API creates a `pending` food order and order item rows.
+5. API allows status updates through the approved flow: `pending -> preparing`, `pending -> cancelled`, or `preparing -> served`.
+
+### 11.19 POS Amenity and Laundry Service Order
+
+1. POS user selects a checked-in booking.
+2. User selects `type = amenity` or `type = laundry`.
+3. API validates the booking is `checked_in`, the room is `occupied`, and every item belongs to the correct service category.
+4. API creates a `pending` service order and service order item rows.
+5. API allows status updates through the approved flow: `pending -> processing`, `pending -> cancelled`, or `processing -> completed`.
+
 ## 12. Permissions
 
 Permissions should be role-based for the initial release. Granular permissions can be added later if required.
@@ -1852,6 +2416,8 @@ Permissions should be role-based for the initial release. Granular permissions c
 | View inventory setup | Yes | No | No | Yes | No | Yes |
 | Manage items | Yes | No | No | No | No | Yes |
 | View items | Yes | No | No | Yes | No | Yes |
+| Manage menus | Yes | No | No | Yes | No | No |
+| View menus | Yes | Yes | Yes | Yes | Yes | No |
 | Manage warehouses | Yes | No | No | No | No | Yes |
 | View warehouses | Yes | No | No | Yes | No | Yes |
 | Manage stock documents | Yes | No | No | No | No | Yes |
@@ -1862,10 +2428,18 @@ Permissions should be role-based for the initial release. Granular permissions c
 | View audit logs | Yes | No | No | No | No | No |
 | View activity history through audit logs | Yes | No | No | No | No | No |
 | Restore deleted records | Yes | No | No | No | No | No |
+| POS room availability | Yes | Yes | Yes | Limited | Yes | No |
+| POS booking dashboard | Yes | Yes | Yes | No | Yes | No |
+| Create reservation booking | Yes | Yes | Yes | No | No | No |
+| Create walk-in booking | Yes | Yes | Limited | No | No | No |
+| Check in, partial payment, and checkout | Yes | Yes | Limited | No | No | No |
+| Create food orders | Yes | Yes | No | Yes | No | No |
+| Create amenity and laundry service orders | Yes | Yes | No | No | Yes | No |
 
 Limited permissions:
 
 - Reservation Administrator may update room status only when related to reservation operations, such as `available` to `reserved` or `reserved` to `available`.
+- Portal access is checked before role-level authorization: Admin routes require `portal_access = admin` or `both`; POS routes require `portal_access = pos` or `both`.
 - Current implemented admin routes are protected by Hotel Administrator role middleware. Inventory Administrator access may be opened later with route-level permission changes.
 
 ## 13. Architecture
@@ -1879,13 +2453,22 @@ app/
   Enums/
     AdjustmentStatusEnum.php
     AdjustmentTypeEnum.php
+    BookingChargeTypeEnum.php
+    BookingPaymentTypeEnum.php
+    BookingStatusEnum.php
+    BookingTypeEnum.php
     CashbookTransactionTypeEnum.php
     FixedAssetStatusEnum.php
+    FoodOrderStatusEnum.php
+    PaymentMethodEnum.php
     RoomBedTypeEnum.php
     RoomStatusEnum.php
+    ServiceOrderStatusEnum.php
+    ServiceOrderTypeEnum.php
     StockInStatusEnum.php
     StockOutStatusEnum.php
     TransferStatusEnum.php
+    UserPortalAccessEnum.php
     UserRoleEnum.php
   Http/
     Controllers/
@@ -1905,6 +2488,8 @@ app/
             ItemCategoryController.php
             ItemController.php
             ItemUnitConversionController.php
+            MenuCategoryController.php
+            MenuController.php
             RoomCategoryController.php
             RoomController.php
             StockInController.php
@@ -1913,6 +2498,15 @@ app/
             UnitGroupController.php
             UserController.php
             WarehouseController.php
+          Pos/
+            AuthController.php
+            BookingController.php
+            BookingDashboardController.php
+            FoodOrderController.php
+            ItemController.php
+            MenuController.php
+            RoomController.php
+            ServiceOrderController.php
     Requests/
       AssetCategories/
       Auth/
@@ -1924,6 +2518,12 @@ app/
       ItemCategories/
       ItemUnitConversions/
       Items/
+      MenuCategories/
+      Menus/
+      Pos/
+        Bookings/
+        FoodOrders/
+        ServiceOrders/
       RoomCategories/
       Rooms/
       StockIns/
@@ -1962,6 +2562,22 @@ app/
       Items/
         ItemResource.php
         ItemWarehouseBalanceResource.php
+      MenuCategories/
+        MenuCategoryResource.php
+      Menus/
+        MenuResource.php
+        MenuRecipeResource.php
+      Pos/
+        Bookings/
+          PosBookingResource.php
+        FoodOrders/
+          PosFoodOrderResource.php
+        Menus/
+          PosMenuResource.php
+        Rooms/
+          PosRoomResource.php
+        ServiceOrders/
+          PosServiceOrderResource.php
       RoomCategories/
         RoomCategoryResource.php
       Rooms/
@@ -1983,9 +2599,13 @@ app/
         WarehouseResource.php
   Models/
     AssetCategory.php
+    Booking.php
+    BookingPayment.php
     Cashbook.php
     CashbookTransaction.php
     FixedAsset.php
+    FoodOrder.php
+    FoodOrderItem.php
     InventoryAdjustment.php
     InventoryAdjustmentItem.php
     InventoryLedger.php
@@ -1995,9 +2615,14 @@ app/
     Item.php
     ItemCategory.php
     ItemUnitConversion.php
+    Menu.php
+    MenuCategory.php
+    MenuRecipe.php
     RoomCategory.php
     Room.php
     RoomBed.php
+    ServiceOrder.php
+    ServiceOrderItem.php
     StockIn.php
     StockInItem.php
     StockOut.php
@@ -2018,12 +2643,17 @@ app/
       AuditLogService.php
     Auth/
       AuthService.php
+    Bookings/
+      BookingDashboardService.php
+      BookingService.php
     Cashbooks/
       CashbookService.php
     CashbookTransactions/
       CashbookTransactionService.php
     FixedAssets/
       FixedAssetService.php
+    FoodOrders/
+      FoodOrderService.php
     Inventory/
       InventoryDocumentService.php
     InventoryAdjustments/
@@ -2040,10 +2670,16 @@ app/
       ItemUnitConversionService.php
     Items/
       ItemService.php
+    MenuCategories/
+      MenuCategoryService.php
+    Menus/
+      MenuService.php
     RoomCategories/
       RoomCategoryService.php
     Rooms/
       RoomService.php
+    ServiceOrders/
+      ServiceOrderService.php
     StockIns/
       StockInService.php
     StockOuts/
@@ -2062,11 +2698,15 @@ app/
 
 - All first-release admin API routes should live under `/api/v1/admin`.
 - Admin controllers should be namespaced under `App\Http\Controllers\Api\V1\Admin`.
+- All first-release POS API routes should live under `/api/v1/pos`.
+- POS controllers should be namespaced under `App\Http\Controllers\Api\V1\Pos`.
 - Breaking changes should be introduced in a future version, for example `/api/v2`.
 
 ### 13.3 Authentication and Authorization
 
 - Sanctum protects all internal API routes except login.
+- `portal:admin` protects Admin Portal routes.
+- `portal:pos` protects POS Portal routes.
 - Role checks may be implemented with custom middleware, policies, or a package such as Spatie Laravel Permission.
 - Policies should guard model-level actions.
 
@@ -2084,6 +2724,11 @@ app/
 - Validate calculated adjustment types through `AdjustmentTypeEnum`.
 - Validate stock movement quantities as positive values.
 - Validate stock decreases against available stock during posting.
+- Validate user `portal_access` through `UserPortalAccessEnum`.
+- Validate booking type, charge type, booking status, payment type, and payment method through enums.
+- Validate food order status transitions so cancellation is allowed only from `pending`.
+- Validate service order status transitions so cancellation is allowed only from `pending`.
+- Validate service order item category matches the selected service order type.
 
 ### 13.5 API Response Layer
 
@@ -2213,12 +2858,15 @@ Required aliases:
 - Create logout endpoint.
 - Create authenticated `me` endpoint.
 - Add role enum or role constants.
+- Add `portal_access` to users.
+- Add `UserPortalAccessEnum` and portal middleware.
 - Add role authorization middleware or policies.
-- Seed initial Hotel Administrator account.
+- Seed initial admin, POS, and both-portal staff accounts.
 
 ### Milestone 3: User Management
 
 - Update user migration/model for role, active state, and audit fields.
+- Add user create/update validation for `portal_access`.
 - Add user requests, resources, controller, and policy.
 - Implement user CRUD.
 - Implement user deactivate, soft delete, and restore.
@@ -2242,6 +2890,7 @@ Required aliases:
 - Implement room CRUD.
 - Implement room status update endpoint.
 - Add audit logging for room changes.
+- Seed room categories and sample rooms for POS booking flows.
 
 ### Milestone 6: Inventory Setup
 
@@ -2249,6 +2898,7 @@ Required aliases:
 - Create units migration and model.
 - Create item categories migration and model.
 - Seed initial unit groups, units, and item categories.
+- Seed service item categories for Amenities and Laundry.
 - Add requests, resources, controllers, and services.
 - Implement CRUD and active toggle endpoints.
 - Add list filters and active-only non-paginated lists.
@@ -2301,6 +2951,9 @@ Required aliases:
 - Add tests for inventory ledger and stock balance responses.
 - Add tests for asset category hierarchy, active lists, and idempotent seed data.
 - Add tests proving a fixed asset creates exactly one cashbook transaction when posted.
+- Add tests for portal access login and route protection.
+- Add tests for POS room list, available rooms, booking dashboard, bookings, deposits, partial payments, and checkout payments.
+- Add tests for food order and service order creation and status transitions.
 - Add tests for duplicate-post protection, immutable posted assets, insufficient cashbook balance, and atomic rollback.
 - Add tests for backend-generated reference numbers, batch numbers, and base quantities.
 - Add tests for consistent API responses.
@@ -2312,6 +2965,7 @@ Required aliases:
 
 - Document environment setup.
 - Document API authentication flow.
+- Document Admin Portal and POS Portal route separation.
 - Document API response format.
 - Document date/time response format.
 - Document inventory setup APIs.
@@ -2319,12 +2973,27 @@ Required aliases:
 - Document warehouse and inventory transaction APIs.
 - Document inventory posting behavior and ledger transaction types.
 - Document cashbook, asset category, and fixed asset APIs.
+- Document POS booking, payment, food order, and service order APIs.
 - Document fixed asset payloads, document metadata, and atomic cashbook posting behavior.
 - Document backend-generated fields.
 - Document audit log filters and morph aliases.
 - Document role permissions.
 - Provide seed data instructions.
 - Prepare dashboard integration notes.
+
+### Milestone 12: POS Portal Operations
+
+- Add POS route file and `/api/v1/pos` route grouping.
+- Add POS auth controller using the shared user system.
+- Add room list, available room list, and room detail endpoints for POS.
+- Add bookings, booking payments, booking dashboard, food orders, and service orders tables.
+- Add booking, booking payment, food order, and service order enums.
+- Add booking creation for reservations and walk-ins.
+- Add optional reservation deposit flow.
+- Add partial payment and checkout payment flows.
+- Add food menu list and food order status workflow.
+- Add amenity and laundry item list and service order workflow.
+- Include food orders, service orders, and calculated totals in booking detail response.
 
 ## 15. Open Questions
 
@@ -2342,3 +3011,5 @@ Required aliases:
 - Should cancelled posted stock documents be reversible through a formal reversal document instead of status changes?
 - Should fixed asset documents remain external path metadata, or should a dedicated upload and document storage API be added?
 - Should fixed asset depreciation and disposal workflows be added in a later phase?
+- Should posted booking payments also create cashbook transaction rows automatically, or should the booking payment table remain the operational source for this phase?
+- Should service order inventory consumption be connected to stock ledgers later?
