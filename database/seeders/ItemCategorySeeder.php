@@ -36,6 +36,10 @@ class ItemCategorySeeder extends Seeder
                 'Kitchen Accessories',
                 'Equipment Accessories',
             ],
+            'Services' => [
+                'Amenities',
+                'Laundry',
+            ],
         ];
 
         foreach ($categories as $parentName => $children) {

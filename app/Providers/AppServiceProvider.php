@@ -8,6 +8,8 @@ use App\Models\BookingPayment;
 use App\Models\Cashbook;
 use App\Models\CashbookTransaction;
 use App\Models\FixedAsset;
+use App\Models\FoodOrder;
+use App\Models\FoodOrderItem;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryAdjustmentItem;
 use App\Models\InventoryTransfer;
@@ -22,6 +24,8 @@ use App\Models\MenuRecipe;
 use App\Models\Room;
 use App\Models\RoomBed;
 use App\Models\RoomCategory;
+use App\Models\ServiceOrder;
+use App\Models\ServiceOrderItem;
 use App\Models\StockIn;
 use App\Models\StockInItem;
 use App\Models\StockOut;
@@ -57,6 +61,10 @@ class AppServiceProvider extends ServiceProvider
             'booking_payment' => BookingPayment::class,
             'asset_category' => AssetCategory::class,
             'fixed_asset' => FixedAsset::class,
+            'food_order' => FoodOrder::class,
+            'food_order_item' => FoodOrderItem::class,
+            'service_order' => ServiceOrder::class,
+            'service_order_item' => ServiceOrderItem::class,
             'cashbook' => Cashbook::class,
             'cashbook_transaction' => CashbookTransaction::class,
             'supplier' => Supplier::class,

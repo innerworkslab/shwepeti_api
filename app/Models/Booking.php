@@ -80,6 +80,16 @@ class Booking extends Model implements AuditableContract
         return $this->hasMany(BookingPayment::class);
     }
 
+    public function foodOrders(): HasMany
+    {
+        return $this->hasMany(FoodOrder::class);
+    }
+
+    public function serviceOrders(): HasMany
+    {
+        return $this->hasMany(ServiceOrder::class);
+    }
+
     /**
      * @param  Builder<Booking>  $query
      * @param  array<string, mixed>  $filters

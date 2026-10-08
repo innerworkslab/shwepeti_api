@@ -2,8 +2,12 @@
 
 namespace App\Http\Resources\Pos\Bookings;
 
+use App\Enums\FoodOrderStatusEnum;
+use App\Enums\ServiceOrderStatusEnum;
 use App\Http\Resources\Concerns\FormatsDateTime;
+use App\Http\Resources\Pos\FoodOrders\PosFoodOrderResource;
 use App\Http\Resources\Pos\Rooms\PosRoomResource;
+use App\Http\Resources\Pos\ServiceOrders\PosServiceOrderResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,6 +20,12 @@ class PosBookingResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $foodOrderAmount = $this->foodOrderAmount();
+        $serviceOrderAmount = $this->serviceOrderAmount();
+        $orderAmount = $foodOrderAmount + $serviceOrderAmount;
+        $grandTotalAmount = (float) $this->total_amount + $orderAmount;
+        $balanceAmount = max(0, $grandTotalAmount - (float) $this->paid_amount);
+
         return [
             'id' => $this->id,
             'booking_no' => $this->booking_no,
@@ -38,10 +48,17 @@ class PosBookingResource extends JsonResource
             'subtotal' => $this->subtotal,
             'discount_amount' => $this->discount_amount,
             'tax_amount' => $this->tax_amount,
+            'room_total_amount' => $this->total_amount,
+            'food_order_amount' => number_format($foodOrderAmount, 2, '.', ''),
+            'service_order_amount' => number_format($serviceOrderAmount, 2, '.', ''),
+            'order_amount' => number_format($orderAmount, 2, '.', ''),
+            'grand_total_amount' => number_format($grandTotalAmount, 2, '.', ''),
             'total_amount' => $this->total_amount,
             'paid_amount' => $this->paid_amount,
-            'balance_amount' => $this->balance_amount,
+            'balance_amount' => number_format($balanceAmount, 2, '.', ''),
             'payments' => PosBookingPaymentResource::collection($this->whenLoaded('payments')),
+            'food_orders' => PosFoodOrderResource::collection($this->whenLoaded('foodOrders')),
+            'service_orders' => PosServiceOrderResource::collection($this->whenLoaded('serviceOrders')),
             'note' => $this->note,
             'created_by' => $this->created_by,
             'updated_by' => $this->updated_by,
@@ -50,5 +67,27 @@ class PosBookingResource extends JsonResource
             'created_at' => $this->dateTime($this->created_at),
             'updated_at' => $this->dateTime($this->updated_at),
         ];
+    }
+
+    private function foodOrderAmount(): float
+    {
+        if (! $this->resource->relationLoaded('foodOrders')) {
+            return 0;
+        }
+
+        return (float) $this->foodOrders
+            ->reject(fn ($foodOrder) => $foodOrder->status === FoodOrderStatusEnum::Cancelled)
+            ->sum(fn ($foodOrder) => (float) $foodOrder->total_amount);
+    }
+
+    private function serviceOrderAmount(): float
+    {
+        if (! $this->resource->relationLoaded('serviceOrders')) {
+            return 0;
+        }
+
+        return (float) $this->serviceOrders
+            ->reject(fn ($serviceOrder) => $serviceOrder->status === ServiceOrderStatusEnum::Cancelled)
+            ->sum(fn ($serviceOrder) => (float) $serviceOrder->total_amount);
     }
 }

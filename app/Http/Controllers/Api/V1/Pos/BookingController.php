@@ -39,7 +39,12 @@ class BookingController extends Controller
     {
         return ApiResponse::resource(
             'Booking retrieved successfully.',
-            PosBookingResource::make($booking->load(['room.roomCategory', 'payments'])),
+            PosBookingResource::make($booking->load([
+                'room.roomCategory',
+                'payments',
+                'foodOrders.items.menu.menuCategory',
+                'serviceOrders.items.item.itemCategory',
+            ])),
         );
     }
 

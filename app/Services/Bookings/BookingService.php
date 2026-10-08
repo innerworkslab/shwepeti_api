@@ -6,7 +6,9 @@ use App\Enums\BookingChargeTypeEnum;
 use App\Enums\BookingPaymentTypeEnum;
 use App\Enums\BookingStatusEnum;
 use App\Enums\BookingTypeEnum;
+use App\Enums\FoodOrderStatusEnum;
 use App\Enums\RoomStatusEnum;
+use App\Enums\ServiceOrderStatusEnum;
 use App\Http\Resources\Pos\Bookings\PosBookingResource;
 use App\Models\Booking;
 use App\Models\BookingPayment;
@@ -122,7 +124,7 @@ class BookingService
                 'updated_by' => $actor?->id,
             ]);
 
-            return new PosBookingResource($booking->refresh()->load(['room.roomCategory', 'payments']));
+            return new PosBookingResource($booking->refresh()->load($this->detailRelations()));
         });
     }
 
@@ -149,7 +151,7 @@ class BookingService
                 'updated_by' => $actor?->id,
             ]);
 
-            return new PosBookingResource($booking->refresh()->load(['room.roomCategory', 'payments']));
+            return new PosBookingResource($booking->refresh()->load($this->detailRelations()));
         });
     }
 
@@ -176,7 +178,7 @@ class BookingService
                 'updated_by' => $actor?->id,
             ]);
 
-            return new PosBookingResource($booking->refresh()->load(['room.roomCategory', 'payments']));
+            return new PosBookingResource($booking->refresh()->load($this->detailRelations()));
         });
     }
 
@@ -184,7 +186,7 @@ class BookingService
     {
         return DB::transaction(function () use ($booking, $data, $actor): PosBookingResource {
             $booking = Booking::query()
-                ->with('room')
+                ->with(['room', 'foodOrders', 'serviceOrders'])
                 ->lockForUpdate()
                 ->findOrFail($booking->id);
 
@@ -195,8 +197,9 @@ class BookingService
             }
 
             $amount = (float) $data['amount'];
+            $balanceAmount = $this->balanceAmount($booking);
 
-            if ($amount < (float) $booking->balance_amount) {
+            if ($amount < $balanceAmount) {
                 throw ValidationException::withMessages([
                     'amount' => ['Checkout payment must cover the remaining balance.'],
                 ]);
@@ -218,7 +221,7 @@ class BookingService
 
             $booking->update([
                 'paid_amount' => $paidAmount,
-                'balance_amount' => max(0, (float) $booking->total_amount - $paidAmount),
+                'balance_amount' => max(0, $this->payableAmount($booking) - $paidAmount),
                 'status' => BookingStatusEnum::CheckedOut,
                 'checked_out_at' => now(),
                 'checked_out_by' => $actor?->id,
@@ -230,7 +233,7 @@ class BookingService
                 'updated_by' => $actor?->id,
             ]);
 
-            return new PosBookingResource($booking->refresh()->load(['room.roomCategory', 'payments']));
+            return new PosBookingResource($booking->refresh()->load($this->detailRelations()));
         });
     }
 
@@ -238,7 +241,7 @@ class BookingService
     {
         return DB::transaction(function () use ($booking, $data, $actor): PosBookingResource {
             $booking = Booking::query()
-                ->with('room')
+                ->with(['room', 'foodOrders', 'serviceOrders'])
                 ->lockForUpdate()
                 ->findOrFail($booking->id);
 
@@ -249,8 +252,9 @@ class BookingService
             }
 
             $amount = (float) $data['amount'];
+            $balanceAmount = $this->balanceAmount($booking);
 
-            if ($amount > (float) $booking->balance_amount) {
+            if ($amount > $balanceAmount) {
                 throw ValidationException::withMessages([
                     'amount' => ['Partial payment cannot be greater than the remaining balance.'],
                 ]);
@@ -272,11 +276,11 @@ class BookingService
 
             $booking->update([
                 'paid_amount' => $paidAmount,
-                'balance_amount' => max(0, (float) $booking->total_amount - $paidAmount),
+                'balance_amount' => max(0, $this->payableAmount($booking) - $paidAmount),
                 'updated_by' => $actor?->id,
             ]);
 
-            return new PosBookingResource($booking->refresh()->load(['room.roomCategory', 'payments']));
+            return new PosBookingResource($booking->refresh()->load($this->detailRelations()));
         });
     }
 
@@ -301,8 +305,55 @@ class BookingService
                 'updated_by' => $actor?->id,
             ]);
 
-            return new PosBookingResource($booking->refresh()->load(['room.roomCategory', 'payments']));
+            return new PosBookingResource($booking->refresh()->load($this->detailRelations()));
         });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function detailRelations(): array
+    {
+        return [
+            'room.roomCategory',
+            'payments',
+            'foodOrders.items.menu.menuCategory',
+            'serviceOrders.items.item.itemCategory',
+        ];
+    }
+
+    private function payableAmount(Booking $booking): float
+    {
+        return (float) $booking->total_amount
+            + $this->foodOrderAmount($booking)
+            + $this->serviceOrderAmount($booking);
+    }
+
+    private function balanceAmount(Booking $booking): float
+    {
+        return max(0, $this->payableAmount($booking) - (float) $booking->paid_amount);
+    }
+
+    private function foodOrderAmount(Booking $booking): float
+    {
+        if (! $booking->relationLoaded('foodOrders')) {
+            $booking->load('foodOrders');
+        }
+
+        return (float) $booking->foodOrders
+            ->reject(fn ($foodOrder) => $foodOrder->status === FoodOrderStatusEnum::Cancelled)
+            ->sum(fn ($foodOrder) => (float) $foodOrder->total_amount);
+    }
+
+    private function serviceOrderAmount(Booking $booking): float
+    {
+        if (! $booking->relationLoaded('serviceOrders')) {
+            $booking->load('serviceOrders');
+        }
+
+        return (float) $booking->serviceOrders
+            ->reject(fn ($serviceOrder) => $serviceOrder->status === ServiceOrderStatusEnum::Cancelled)
+            ->sum(fn ($serviceOrder) => (float) $serviceOrder->total_amount);
     }
 
     private function nextBookingNo(): string
