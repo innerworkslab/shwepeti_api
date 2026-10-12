@@ -30,7 +30,8 @@ class SaveMenuRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
-            'image_url' => ['nullable', 'string', 'max:2048'],
+            'image_url' => ['nullable', 'url', 'max:2048'],
+            'image' => ['nullable', 'image', 'max:2048'],
             'is_available' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
             'recipes' => ['sometimes', 'array'],
@@ -44,6 +45,8 @@ class SaveMenuRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->normalizeImageUrlUpload();
+
         if ($this->has('name')) {
             $this->merge([
                 'name' => preg_replace('/\s+/', ' ', trim((string) $this->input('name'))),
@@ -55,5 +58,25 @@ class SaveMenuRequest extends FormRequest
                 'code' => strtoupper(str_replace([' ', '-'], '_', trim((string) $this->input('code')))),
             ]);
         }
+
+        if ($this->has('image_url') && filled($this->input('image_url'))) {
+            $this->merge([
+                'image_url' => trim((string) $this->input('image_url')),
+            ]);
+        }
+    }
+
+    private function normalizeImageUrlUpload(): void
+    {
+        if (! $this->hasFile('image_url')) {
+            return;
+        }
+
+        if (! $this->hasFile('image')) {
+            $this->files->set('image', $this->file('image_url'));
+        }
+
+        $this->files->remove('image_url');
+        $this->convertedFiles = null;
     }
 }

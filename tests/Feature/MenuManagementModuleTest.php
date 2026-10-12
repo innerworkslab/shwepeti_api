@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Enums\UserRoleEnum;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class MenuManagementModuleTest extends TestCase
@@ -108,6 +110,29 @@ class MenuManagementModuleTest extends TestCase
             'item_id' => $setup['chicken_id'],
             'unit_id' => $setup['g_id'],
         ]);
+    }
+
+    public function test_it_accepts_uploaded_menu_image_from_image_url_field(): void
+    {
+        Storage::fake('public');
+        $headers = $this->authHeaders();
+        $setup = $this->menuSetup($headers);
+        $headers['Accept'] = 'application/json';
+
+        $created = $this->withHeaders($headers)->post('/api/v1/admin/menus', [
+            'menu_category_id' => $setup['menu_category_id'],
+            'name' => 'Chicken Fried Rice',
+            'code' => 'chicken fried rice',
+            'price' => 4500,
+            'image_url' => UploadedFile::fake()->image('chicken-fried-rice.jpeg'),
+        ]);
+
+        $created->assertCreated()
+            ->assertJsonMissingValidationErrors(['image_url', 'image']);
+
+        $imagePath = $created->json('data.image_url');
+        $this->assertStringStartsWith('menus/', $imagePath);
+        Storage::disk('public')->assertExists($imagePath);
     }
 
     public function test_it_toggles_menu_active_and_available_state(): void

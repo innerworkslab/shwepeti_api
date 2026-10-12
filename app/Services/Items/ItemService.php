@@ -6,6 +6,7 @@ use App\Http\Resources\Items\ItemResource;
 use App\Models\Item;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -49,6 +50,8 @@ class ItemService
                 ? Item::query()->whereKey($data['id'])->lockForUpdate()->firstOrFail()
                 : null;
 
+            $imageUrl = $this->imageUrl($data, $existingItem?->image_url);
+
             $item = Item::query()->updateOrCreate(['id' => $data['id'] ?? null], [
                 'item_category_id' => $data['item_category_id'],
                 'name' => $data['name'],
@@ -57,6 +60,7 @@ class ItemService
                 'barcode' => $data['barcode'] ?? null,
                 'stock_unit_id' => $data['stock_unit_id'],
                 'description' => $data['description'] ?? null,
+                'image_url' => $imageUrl,
                 'min_stock' => $data['min_stock'] ?? null,
                 'price' => array_key_exists('price', $data) ? $data['price'] : $existingItem?->price,
                 'is_active' => $data['is_active'] ?? true,
@@ -115,6 +119,24 @@ class ItemService
         $oldPrice = $oldPrice === null ? null : number_format((float) $oldPrice, 2, '.', '');
 
         return $oldPrice !== $newPrice;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function imageUrl(array $data, ?string $currentUrl): ?string
+    {
+        if (($data['image'] ?? null) instanceof UploadedFile) {
+            $path = $data['image']->store('items', 'public');
+
+            return $path === false ? $currentUrl : $path;
+        }
+
+        if (array_key_exists('image_url', $data)) {
+            return $data['image_url'];
+        }
+
+        return $currentUrl;
     }
 
     private function recordPriceHistory(Item $item, mixed $oldPrice, mixed $newPrice, ?User $actor = null): void

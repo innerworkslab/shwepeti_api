@@ -12,6 +12,7 @@ use App\Enums\PaymentMethodEnum;
 use App\Enums\RoomStatusEnum;
 use App\Enums\UserPortalAccessEnum;
 use App\Enums\UserRoleEnum;
+use App\Models\Booking;
 use App\Models\Cashbook;
 use App\Models\Room;
 use App\Models\RoomCategory;
@@ -85,6 +86,49 @@ class PosBookingModuleTest extends TestCase
             ->assertJsonPath('data.room_categories.0.availability.0.booked_count', 1)
             ->assertJsonPath('data.room_categories.0.availability.0.available_count', 1)
             ->assertJsonPath('data.room_categories.0.rooms.0.bookings.0.guest_name', 'Dashboard Guest');
+    }
+
+    public function test_it_accepts_per_page_as_camel_case_for_pos_booking_lists(): void
+    {
+        $room = $this->createAvailableRoom();
+
+        Booking::query()->create([
+            'booking_no' => 'BK-TEST-001',
+            'room_id' => $room->id,
+            'booking_type' => BookingTypeEnum::Reservation->value,
+            'charge_type' => BookingChargeTypeEnum::Day->value,
+            'guest_name' => 'First Guest',
+            'expected_check_in_at' => now()->addHour(),
+            'expected_check_out_at' => now()->addDay(),
+            'status' => BookingStatusEnum::Reserved->value,
+            'room_rate' => 100,
+            'subtotal' => 100,
+            'total_amount' => 100,
+            'paid_amount' => 0,
+            'balance_amount' => 100,
+        ]);
+
+        Booking::query()->create([
+            'booking_no' => 'BK-TEST-002',
+            'room_id' => $room->id,
+            'booking_type' => BookingTypeEnum::Reservation->value,
+            'charge_type' => BookingChargeTypeEnum::Day->value,
+            'guest_name' => 'Second Guest',
+            'expected_check_in_at' => now()->addHours(2),
+            'expected_check_out_at' => now()->addDays(2),
+            'status' => BookingStatusEnum::Reserved->value,
+            'room_rate' => 100,
+            'subtotal' => 100,
+            'total_amount' => 100,
+            'paid_amount' => 0,
+            'balance_amount' => 100,
+        ]);
+
+        $this->withHeaders($this->posAuthHeaders())
+            ->getJson('/api/v1/pos/bookings?page=1&perPage=1')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.per_page', 1);
     }
 
     public function test_it_creates_a_reserved_booking_and_marks_room_reserved(): void

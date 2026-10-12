@@ -6,6 +6,7 @@ use App\Http\Resources\Menus\MenuResource;
 use App\Models\Menu;
 use App\Services\Inventory\InventoryDocumentService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -30,6 +31,11 @@ class MenuService
     public function save(array $data): MenuResource
     {
         return DB::transaction(function () use ($data): MenuResource {
+            $existingMenu = filled($data['id'] ?? null)
+                ? Menu::query()->whereKey($data['id'])->lockForUpdate()->firstOrFail()
+                : null;
+            $imageUrl = $this->imageUrl($data, $existingMenu?->image_url);
+
             $menu = Menu::query()->updateOrCreate(['id' => $data['id'] ?? null], [
                 'menu_category_id' => $data['menu_category_id'],
                 'name' => $data['name'],
@@ -37,7 +43,7 @@ class MenuService
                 'description' => $data['description'] ?? null,
                 'price' => $data['price'],
                 'cost_price' => $data['cost_price'] ?? null,
-                'image_url' => $data['image_url'] ?? null,
+                'image_url' => $imageUrl,
                 'is_available' => $data['is_available'] ?? true,
                 'is_active' => $data['is_active'] ?? true,
             ]);
@@ -89,6 +95,24 @@ class MenuService
 
             return new MenuResource($menu);
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function imageUrl(array $data, ?string $currentUrl): ?string
+    {
+        if (($data['image'] ?? null) instanceof UploadedFile) {
+            $path = $data['image']->store('menus', 'public');
+
+            return $path === false ? $currentUrl : $path;
+        }
+
+        if (array_key_exists('image_url', $data)) {
+            return $data['image_url'];
+        }
+
+        return $currentUrl;
     }
 
     /**

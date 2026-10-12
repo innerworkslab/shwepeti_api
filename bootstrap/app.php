@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureUserPortalAccess;
 use App\Http\Middleware\EnsureUserRole;
+use App\Http\Middleware\NormalizePaginationRequest;
 use App\Support\ApiResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -19,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->appendToGroup('api', [
+            NormalizePaginationRequest::class,
+        ]);
+
         $middleware->alias([
             'portal' => EnsureUserPortalAccess::class,
             'role' => EnsureUserRole::class,

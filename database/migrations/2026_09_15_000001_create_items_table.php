@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('barcode')->nullable()->unique();
             $table->foreignId('stock_unit_id')->constrained('units')->restrictOnDelete();
             $table->text('description')->nullable();
+            $table->string('image_url')->nullable();
             $table->decimal('min_stock', 18, 6)->nullable();
             $table->decimal('price', 18, 2)->nullable();
             $table->boolean('is_active')->default(true)->index();

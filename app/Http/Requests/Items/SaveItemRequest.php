@@ -41,6 +41,8 @@ class SaveItemRequest extends FormRequest
             ],
             'stock_unit_id' => ['required', 'integer', 'exists:units,id'],
             'description' => ['nullable', 'string'],
+            'image_url' => ['nullable', 'url', 'max:2048'],
+            'image' => ['nullable', 'image', 'max:2048'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
             'price' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
@@ -55,18 +57,34 @@ class SaveItemRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->normalizeImageUrlUpload();
+
         if ($this->has('name')) {
             $this->merge([
                 'name' => preg_replace('/\s+/', ' ', trim((string) $this->input('name'))),
             ]);
         }
 
-        foreach (['code', 'sku', 'barcode'] as $field) {
+        foreach (['code', 'sku', 'barcode', 'image_url'] as $field) {
             if ($this->has($field) && filled($this->input($field))) {
                 $this->merge([
                     $field => trim((string) $this->input($field)),
                 ]);
             }
         }
+    }
+
+    private function normalizeImageUrlUpload(): void
+    {
+        if (! $this->hasFile('image_url')) {
+            return;
+        }
+
+        if (! $this->hasFile('image')) {
+            $this->files->set('image', $this->file('image_url'));
+        }
+
+        $this->files->remove('image_url');
+        $this->convertedFiles = null;
     }
 }

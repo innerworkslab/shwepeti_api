@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-#[Fillable(['item_category_id', 'name', 'code', 'sku', 'barcode', 'stock_unit_id', 'description', 'min_stock', 'price', 'is_active'])]
+#[Fillable(['item_category_id', 'name', 'code', 'sku', 'barcode', 'stock_unit_id', 'description', 'image_url', 'min_stock', 'price', 'is_active'])]
 class Item extends Model implements AuditableContract
 {
     use Auditable;

@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Enums\UserRoleEnum;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ItemManagementModuleTest extends TestCase
@@ -24,6 +26,7 @@ class ItemManagementModuleTest extends TestCase
             'barcode' => 'BAR-CHICKEN',
             'stock_unit_id' => $setup['kg_id'],
             'description' => 'Raw chicken stock',
+            'image_url' => 'https://example.com/images/chicken.jpg',
             'min_stock' => 10.5,
             'price' => 12000,
             'is_active' => true,
@@ -47,6 +50,7 @@ class ItemManagementModuleTest extends TestCase
             ->assertJsonPath('data.name', 'Chicken')
             ->assertJsonPath('data.code', 'CHICKEN')
             ->assertJsonPath('data.stock_unit_id', $setup['kg_id'])
+            ->assertJsonPath('data.image_url', 'https://example.com/images/chicken.jpg')
             ->assertJsonPath('data.price', '12000.00')
             ->assertJsonCount(2, 'data.item_unit_conversions');
 
@@ -58,6 +62,7 @@ class ItemManagementModuleTest extends TestCase
             'name' => 'Chicken Updated',
             'code' => 'CHICKEN',
             'stock_unit_id' => $setup['kg_id'],
+            'image_url' => null,
             'min_stock' => 15,
             'price' => 12500,
             'is_active' => false,
@@ -72,6 +77,7 @@ class ItemManagementModuleTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('data.name', 'Chicken Updated')
             ->assertJsonPath('data.is_active', false)
+            ->assertJsonPath('data.image_url', null)
             ->assertJsonPath('data.price', '12500.00')
             ->assertJsonCount(1, 'data.item_unit_conversions');
 
@@ -97,6 +103,29 @@ class ItemManagementModuleTest extends TestCase
             'from_unit_id' => $setup['box_id'],
             'to_unit_id' => $setup['kg_id'],
         ]);
+    }
+
+    public function test_it_accepts_uploaded_item_image_from_image_url_field(): void
+    {
+        Storage::fake('public');
+        $headers = $this->authHeaders();
+        $setup = $this->inventorySetup($headers);
+        $headers['Accept'] = 'application/json';
+
+        $created = $this->withHeaders($headers)->post('/api/v1/admin/items', [
+            'item_category_id' => $setup['item_category_id'],
+            'name' => 'Chicken',
+            'code' => 'CHICKEN',
+            'stock_unit_id' => $setup['kg_id'],
+            'image_url' => UploadedFile::fake()->image('chicken.jpeg'),
+        ]);
+
+        $created->assertCreated()
+            ->assertJsonMissingValidationErrors(['image_url', 'image']);
+
+        $imagePath = $created->json('data.image_url');
+        $this->assertStringStartsWith('items/', $imagePath);
+        Storage::disk('public')->assertExists($imagePath);
     }
 
     public function test_it_saves_and_toggles_item_unit_conversions(): void

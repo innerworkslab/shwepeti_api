@@ -144,6 +144,28 @@ class AuthAndUserModuleTest extends TestCase
         ]);
     }
 
+    public function test_it_accepts_per_page_as_camel_case_for_admin_lists(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin@example.com',
+            'password' => 'password',
+            'role' => UserRoleEnum::HotelAdministrator->value,
+        ]);
+
+        User::factory()->count(3)->create();
+
+        $token = $this->postJson('/api/v1/admin/login', [
+            'email' => $admin->email,
+            'password' => 'password',
+        ])->json('data.token');
+
+        $this->withHeaders(['Authorization' => "Bearer {$token}"])
+            ->getJson('/api/v1/admin/users?page=1&perPage=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.per_page', 2);
+    }
+
     public function test_it_blocks_non_hotel_administrators_from_user_management(): void
     {
         $frontOffice = User::factory()->create([
