@@ -4,6 +4,7 @@ namespace App\Http\Resources\Menus;
 
 use App\Http\Resources\Concerns\FormatsDateTime;
 use App\Http\Resources\MenuCategories\MenuCategoryResource;
+use App\Http\Resources\Warehouses\WarehouseResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,6 +20,7 @@ class MenuResource extends JsonResource
         return [
             'id' => $this->id,
             'menu_category_id' => $this->menu_category_id,
+            'warehouse_id' => $this->warehouse_id,
             'name' => $this->name,
             'code' => $this->code,
             'description' => $this->description,
@@ -28,6 +30,7 @@ class MenuResource extends JsonResource
             'is_available' => $this->is_available,
             'is_active' => $this->is_active,
             'menu_category' => MenuCategoryResource::make($this->whenLoaded('menuCategory')),
+            'warehouse' => WarehouseResource::make($this->whenLoaded('warehouse')),
             'recipes' => MenuRecipeResource::collection($this->whenLoaded('recipes')),
             'created_at' => $this->dateTime($this->created_at),
             'updated_at' => $this->dateTime($this->updated_at),

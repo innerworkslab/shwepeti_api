@@ -20,7 +20,7 @@ class CashbookSeederTest extends TestCase
 
         $this->seed(CashbookSeeder::class);
 
-        $this->assertDatabaseCount('cashbooks', 3);
+        $this->assertDatabaseCount('cashbooks', 5);
         $this->assertDatabaseHas('cashbooks', [
             'code' => 'MAIN-CASH',
             'type' => 'cash',
@@ -31,6 +31,14 @@ class CashbookSeederTest extends TestCase
         $this->assertDatabaseHas('cashbooks', [
             'code' => 'KBZ-BANK',
             'type' => 'bank',
+        ]);
+        $this->assertDatabaseHas('cashbooks', [
+            'code' => 'POS-CASH',
+            'type' => 'pos_cash',
+        ]);
+        $this->assertDatabaseHas('cashbooks', [
+            'code' => 'POS-BANK',
+            'type' => 'pos_bank',
         ]);
     }
 }

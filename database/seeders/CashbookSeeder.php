@@ -29,6 +29,18 @@ class CashbookSeeder extends Seeder
                 'type' => CashbookTypeEnum::Bank->value,
                 'description' => 'AYA bank account.',
             ],
+            [
+                'code' => 'POS-CASH',
+                'name' => 'POS Cash',
+                'type' => CashbookTypeEnum::PosCash->value,
+                'description' => 'POS cash payment cashbook.',
+            ],
+            [
+                'code' => 'POS-BANK',
+                'name' => 'POS Bank',
+                'type' => CashbookTypeEnum::PosBank->value,
+                'description' => 'POS bank payment cashbook.',
+            ],
         ];
 
         foreach ($cashbooks as $cashbook) {

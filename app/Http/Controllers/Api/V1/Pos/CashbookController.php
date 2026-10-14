@@ -15,7 +15,7 @@ class CashbookController extends Controller
 
     public function index(ListCashbookRequest $request): JsonResponse
     {
-        $cashbooks = $this->cashbookService->paginate($request->validated());
+        $cashbooks = $this->cashbookService->paginateForPos($request->validated());
 
         return ApiResponse::resource('Cashbooks retrieved successfully.', CashbookResource::collection($cashbooks));
     }

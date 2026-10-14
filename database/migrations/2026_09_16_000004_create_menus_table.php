@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('menus', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('menu_category_id')->constrained('menu_categories')->restrictOnDelete();
+            $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
             $table->string('name');
             $table->string('code')->unique();
             $table->text('description')->nullable();
@@ -22,6 +23,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index('menu_category_id');
+            $table->index('warehouse_id');
             $table->index('is_available');
             $table->index('is_active');
         });

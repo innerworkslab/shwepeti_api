@@ -3,7 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRoleEnum;
+use App\Models\InventoryLedger;
+use App\Models\InventoryStockBalance;
+use App\Models\Item;
+use App\Models\ItemCategory;
+use App\Models\Unit;
+use App\Models\UnitGroup;
 use App\Models\User;
+use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -257,6 +264,41 @@ class InventoryManagementModuleTest extends TestCase
             ->assertJsonPath('data.0.id', $activeCategoryId);
     }
 
+    public function test_it_includes_inventory_stock_balance_movement_totals(): void
+    {
+        $headers = $this->authHeaders();
+        [$item, $warehouse, $unit] = $this->inventorySetup();
+
+        InventoryStockBalance::query()->create([
+            'item_id' => $item->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 14,
+            'reserved_quantity' => 0,
+            'available_quantity' => 14,
+        ]);
+
+        $this->createInventoryLedger($item, $warehouse, $unit, 10, 10, '2026-09-30 09:00:00');
+        $this->createInventoryLedger($item, $warehouse, $unit, 5, 15, '2026-10-01 09:00:00');
+        $this->createInventoryLedger($item, $warehouse, $unit, -3, 12, '2026-10-02 09:00:00');
+        $this->createInventoryLedger($item, $warehouse, $unit, 2, 14, '2026-11-01 09:00:00');
+
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/admin/inventory-stock-balances?item_id={$item->id}&warehouse_id={$warehouse->id}&date_from=2026-10-01&date_to=2026-10-31&page=1")
+            ->assertOk()
+            ->assertJsonPath('data.0.opening_balance', '10.000000')
+            ->assertJsonPath('data.0.in_balance', '5.000000')
+            ->assertJsonPath('data.0.out_balance', '3.000000')
+            ->assertJsonPath('data.0.closing_balance', '12.000000');
+
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/admin/inventory-stock-balances?item_id={$item->id}&warehouse_id={$warehouse->id}&page=1")
+            ->assertOk()
+            ->assertJsonPath('data.0.opening_balance', '14.000000')
+            ->assertJsonPath('data.0.in_balance', '0.000000')
+            ->assertJsonPath('data.0.out_balance', '0.000000')
+            ->assertJsonPath('data.0.closing_balance', '14.000000');
+    }
+
     /**
      * @return array<string, string>
      */
@@ -274,5 +316,38 @@ class InventoryManagementModuleTest extends TestCase
         ])->json('data.token');
 
         return ['Authorization' => "Bearer {$token}"];
+    }
+
+    /**
+     * @return array{Item, Warehouse, Unit}
+     */
+    private function inventorySetup(): array
+    {
+        $warehouse = Warehouse::query()->create(['code' => 'MAIN', 'name' => 'Main Warehouse']);
+        $unitGroup = UnitGroup::query()->create(['name' => 'Quantity', 'slug' => 'quantity']);
+        $unit = Unit::query()->create(['unit_group_id' => $unitGroup->id, 'name' => 'Piece', 'symbol' => 'pc', 'is_base' => true]);
+        $category = ItemCategory::query()->create(['name' => 'Supplies', 'slug' => 'supplies', 'code' => 'SUPPLIES']);
+        $item = Item::query()->create([
+            'item_category_id' => $category->id,
+            'name' => 'Towel',
+            'code' => 'TOWEL',
+            'stock_unit_id' => $unit->id,
+        ]);
+
+        return [$item, $warehouse, $unit];
+    }
+
+    private function createInventoryLedger(Item $item, Warehouse $warehouse, Unit $unit, float $baseQuantity, float $balanceQuantity, string $transactionDate): void
+    {
+        InventoryLedger::query()->create([
+            'item_id' => $item->id,
+            'warehouse_id' => $warehouse->id,
+            'transaction_type' => $baseQuantity > 0 ? 'in' : 'out',
+            'quantity' => abs($baseQuantity),
+            'unit_id' => $unit->id,
+            'base_quantity' => $baseQuantity,
+            'balance_quantity' => $balanceQuantity,
+            'transaction_date' => $transactionDate,
+        ]);
     }
 }

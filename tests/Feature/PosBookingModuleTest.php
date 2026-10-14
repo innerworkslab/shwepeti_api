@@ -45,6 +45,56 @@ class PosBookingModuleTest extends TestCase
             ->assertJsonPath('data.0.status', RoomStatusEnum::Available->value);
     }
 
+    public function test_it_lists_pos_rooms_with_bookings_filtered_by_date(): void
+    {
+        $room = $this->createAvailableRoom([
+            'name' => 'Room 201',
+            'status' => RoomStatusEnum::Reserved->value,
+        ]);
+
+        $matchingBooking = Booking::query()->create([
+            'booking_no' => 'BK-DATE-001',
+            'room_id' => $room->id,
+            'booking_type' => BookingTypeEnum::Reservation->value,
+            'charge_type' => BookingChargeTypeEnum::Day->value,
+            'guest_name' => 'Date Filter Guest',
+            'expected_check_in_at' => '2026-10-14 12:30:00',
+            'expected_check_out_at' => '2026-10-15 11:30:00',
+            'status' => BookingStatusEnum::Reserved->value,
+            'room_rate' => 100,
+            'subtotal' => 100,
+            'total_amount' => 100,
+            'paid_amount' => 0,
+            'balance_amount' => 100,
+        ]);
+
+        Booking::query()->create([
+            'booking_no' => 'BK-DATE-002',
+            'room_id' => $room->id,
+            'booking_type' => BookingTypeEnum::Reservation->value,
+            'charge_type' => BookingChargeTypeEnum::Day->value,
+            'guest_name' => 'Other Date Guest',
+            'expected_check_in_at' => '2026-10-16 12:30:00',
+            'expected_check_out_at' => '2026-10-17 11:30:00',
+            'status' => BookingStatusEnum::Reserved->value,
+            'room_rate' => 100,
+            'subtotal' => 100,
+            'total_amount' => 100,
+            'paid_amount' => 0,
+            'balance_amount' => 100,
+        ]);
+
+        $this->withHeaders($this->posAuthHeaders())
+            ->getJson('/api/v1/pos/rooms?date=2026-10-14')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $room->id)
+            ->assertJsonPath('data.0.current_booking.id', $matchingBooking->id)
+            ->assertJsonCount(1, 'data.0.bookings')
+            ->assertJsonPath('data.0.bookings.0.id', $matchingBooking->id)
+            ->assertJsonPath('data.0.bookings.0.guest_name', 'Date Filter Guest')
+            ->assertJsonMissing(['guest_name' => 'Other Date Guest']);
+    }
+
     public function test_it_returns_booking_dashboard_grouped_by_room_category(): void
     {
         $category = RoomCategory::query()->create([
@@ -213,6 +263,70 @@ class PosBookingModuleTest extends TestCase
         ]);
     }
 
+    public function test_it_normalizes_reservation_times_and_blocks_overlapping_room_booking(): void
+    {
+        $room = $this->createAvailableRoom();
+        $headers = $this->posAuthHeaders();
+
+        $bookingId = $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::Reservation->value,
+                'guest_name' => 'Reservation Guest',
+                'expected_check_in_at' => '2026-10-14 08:00:00',
+                'expected_check_out_at' => '2026-10-15 20:00:00',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.expected_check_in_at', '2026-10-14 12:30:00')
+            ->assertJsonPath('data.expected_check_out_at', '2026-10-15 11:30:00')
+            ->json('data.id');
+
+        $this->assertDatabaseHas('bookings', [
+            'id' => $bookingId,
+            'expected_check_in_at' => '2026-10-14 12:30:00',
+            'expected_check_out_at' => '2026-10-15 11:30:00',
+        ]);
+
+        $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::Reservation->value,
+                'guest_name' => 'Overlapping Guest',
+                'expected_check_in_at' => '2026-10-14',
+                'expected_check_out_at' => '2026-10-16',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('room_id');
+
+        $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::Reservation->value,
+                'guest_name' => 'Next Reservation Guest',
+                'expected_check_in_at' => '2026-10-15',
+                'expected_check_out_at' => '2026-10-16',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.expected_check_in_at', '2026-10-15 12:30:00')
+            ->assertJsonPath('data.expected_check_out_at', '2026-10-16 11:30:00');
+    }
+
+    public function test_it_blocks_same_day_reservation_after_policy_time_normalization(): void
+    {
+        $room = $this->createAvailableRoom();
+
+        $this->withHeaders($this->posAuthHeaders())
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::Reservation->value,
+                'guest_name' => 'Invalid Reservation Guest',
+                'expected_check_in_at' => '2026-10-14 08:00:00',
+                'expected_check_out_at' => '2026-10-14 20:00:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('expected_check_out_at');
+    }
+
     public function test_it_creates_a_session_booking_using_session_rate(): void
     {
         $room = $this->createAvailableRoom([
@@ -238,6 +352,52 @@ class PosBookingModuleTest extends TestCase
             ->assertJsonPath('data.session_rate', '25000.00')
             ->assertJsonPath('data.subtotal', '25000.00')
             ->assertJsonPath('data.total_amount', '25000.00');
+    }
+
+    public function test_it_blocks_overlapping_walk_in_session_and_allows_back_to_back_session(): void
+    {
+        $room = $this->createAvailableRoom();
+        $headers = $this->posAuthHeaders();
+
+        $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::WalkIn->value,
+                'charge_type' => BookingChargeTypeEnum::Session->value,
+                'guest_name' => 'First Session Guest',
+                'expected_check_in_at' => '2026-10-14 12:00:00',
+                'expected_check_out_at' => '2026-10-14 14:00:00',
+                'session_hours' => 2,
+                'session_rate' => 20000,
+            ])
+            ->assertCreated();
+
+        $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::WalkIn->value,
+                'charge_type' => BookingChargeTypeEnum::Session->value,
+                'guest_name' => 'Overlapping Session Guest',
+                'expected_check_in_at' => '2026-10-14 13:00:00',
+                'expected_check_out_at' => '2026-10-14 15:00:00',
+                'session_hours' => 2,
+                'session_rate' => 20000,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('room_id');
+
+        $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::WalkIn->value,
+                'charge_type' => BookingChargeTypeEnum::Session->value,
+                'guest_name' => 'Back To Back Session Guest',
+                'expected_check_in_at' => '2026-10-14 14:00:00',
+                'expected_check_out_at' => '2026-10-14 16:00:00',
+                'session_hours' => 2,
+                'session_rate' => 20000,
+            ])
+            ->assertCreated();
     }
 
     public function test_it_requires_session_fields_for_session_booking(): void

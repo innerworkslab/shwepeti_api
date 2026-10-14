@@ -14,13 +14,15 @@ class ApiResponse
         mixed $data = null,
         array $meta = [],
         int $status = 200,
+        array $extra = [],
     ): JsonResponse {
-        return response()->json([
+        return response()->json(array_merge([
             'success' => true,
             'message' => $message,
+        ], $extra, [
             'data' => $data,
             'meta' => $meta,
-        ], $status);
+        ]), $status);
     }
 
     public static function resource(
@@ -28,12 +30,14 @@ class ApiResponse
         JsonResource|ResourceCollection $resource,
         array $meta = [],
         int $status = 200,
+        array $extra = [],
     ): JsonResponse {
         return self::success(
             $message,
             $resource->resolve(),
             array_merge(self::paginationMeta($resource), $meta),
             $status,
+            $extra,
         );
     }
 

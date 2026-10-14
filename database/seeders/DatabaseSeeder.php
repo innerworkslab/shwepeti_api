@@ -22,9 +22,9 @@ class DatabaseSeeder extends Seeder
             ItemCategorySeeder::class,
             AssetCategorySeeder::class,
             ItemSeeder::class,
+            WarehouseSeeder::class,
             MenuCategorySeeder::class,
             MenuSeeder::class,
-            WarehouseSeeder::class,
             CashbookSeeder::class,
             SupplierSeeder::class,
         ]);

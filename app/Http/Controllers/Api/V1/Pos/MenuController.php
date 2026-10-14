@@ -19,7 +19,7 @@ class MenuController extends Controller
         ]);
 
         $query = Menu::query()
-            ->with('menuCategory')
+            ->with(['menuCategory', 'warehouse'])
             ->filter($filters)
             ->latest();
 

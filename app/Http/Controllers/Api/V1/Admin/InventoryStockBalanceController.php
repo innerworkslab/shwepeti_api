@@ -16,7 +16,7 @@ class InventoryStockBalanceController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $balances = $this->inventoryStockBalanceService->paginate($request->only(['item_id', 'warehouse_id', 'page', 'per_page']));
+        $balances = $this->inventoryStockBalanceService->paginate($request->only(['item_id', 'warehouse_id', 'date_from', 'date_to', 'page', 'per_page']));
 
         return ApiResponse::resource('Inventory stock balances retrieved successfully.', InventoryStockBalanceResource::collection($balances));
     }

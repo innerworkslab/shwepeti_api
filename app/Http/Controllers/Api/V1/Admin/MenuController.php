@@ -19,7 +19,7 @@ class MenuController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $menus = $this->menuService->paginate($request->only(['search', 'menu_category_id', 'is_available', 'is_active', 'page', 'per_page']));
+        $menus = $this->menuService->paginate($request->only(['search', 'menu_category_id', 'warehouse_id', 'is_available', 'is_active', 'page', 'per_page']));
 
         return ApiResponse::resource(
             'Menus retrieved successfully.',
@@ -44,6 +44,7 @@ class MenuController extends Controller
             'Menu retrieved successfully.',
             MenuResource::make($menu->load([
                 'menuCategory',
+                'warehouse',
                 'recipes.item.itemCategory',
                 'recipes.item.stockUnit',
                 'recipes.unit',

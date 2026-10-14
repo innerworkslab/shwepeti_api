@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\UserRoleEnum;
 use App\Models\User;
+use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -53,6 +54,7 @@ class MenuManagementModuleTest extends TestCase
 
         $created = $this->withHeaders($headers)->postJson('/api/v1/admin/menus', [
             'menu_category_id' => $setup['menu_category_id'],
+            'warehouse_id' => $setup['warehouse_id'],
             'name' => 'Chicken Fried Rice',
             'code' => 'chicken fried rice',
             'description' => 'House fried rice with chicken',
@@ -76,6 +78,7 @@ class MenuManagementModuleTest extends TestCase
 
         $created->assertCreated()
             ->assertJsonPath('data.name', 'Chicken Fried Rice')
+            ->assertJsonPath('data.warehouse_id', $setup['warehouse_id'])
             ->assertJsonPath('data.code', 'CHICKEN_FRIED_RICE')
             ->assertJsonPath('data.price', '4500.00')
             ->assertJsonCount(2, 'data.recipes')
@@ -87,6 +90,7 @@ class MenuManagementModuleTest extends TestCase
         $this->withHeaders($headers)->postJson('/api/v1/admin/menus', [
             'id' => $menuId,
             'menu_category_id' => $setup['menu_category_id'],
+            'warehouse_id' => $setup['warehouse_id'],
             'name' => 'Chicken Fried Rice Updated',
             'code' => 'CHICKEN_FRIED_RICE',
             'price' => 5000,
@@ -121,6 +125,7 @@ class MenuManagementModuleTest extends TestCase
 
         $created = $this->withHeaders($headers)->post('/api/v1/admin/menus', [
             'menu_category_id' => $setup['menu_category_id'],
+            'warehouse_id' => $setup['warehouse_id'],
             'name' => 'Chicken Fried Rice',
             'code' => 'chicken fried rice',
             'price' => 4500,
@@ -215,8 +220,14 @@ class MenuManagementModuleTest extends TestCase
             'code' => 'FOOD',
         ])->json('data.id');
 
+        $warehouse = Warehouse::query()->create([
+            'code' => 'KITCHEN',
+            'name' => 'Kitchen Store',
+        ]);
+
         return [
             'menu_category_id' => $menuCategoryId,
+            'warehouse_id' => $warehouse->id,
             'kg_id' => $kgId,
             'g_id' => $gId,
             'chicken_id' => $chickenId,
@@ -232,6 +243,7 @@ class MenuManagementModuleTest extends TestCase
     {
         return $this->withHeaders($headers)->postJson('/api/v1/admin/menus', [
             'menu_category_id' => $setup['menu_category_id'],
+            'warehouse_id' => $setup['warehouse_id'],
             'name' => 'Fried Rice',
             'code' => 'FRIED_RICE',
             'price' => 3500,

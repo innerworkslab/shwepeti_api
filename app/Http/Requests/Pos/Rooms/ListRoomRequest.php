@@ -22,6 +22,7 @@ class ListRoomRequest extends FormRequest
             'search' => ['nullable', 'string', 'max:255'],
             'room_category_id' => ['nullable', 'integer', 'exists:room_categories,id'],
             'status' => ['nullable', Rule::in(RoomStatusEnum::values())],
+            'date' => ['nullable', 'date'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];

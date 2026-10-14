@@ -7,6 +7,7 @@ use App\Enums\RoomStatusEnum;
 use App\Http\Resources\Rooms\RoomResource;
 use App\Models\Room;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -29,12 +30,16 @@ class RoomService
 
     public function posPaginate(array $filters = []): LengthAwarePaginator|Collection
     {
+        $date = isset($filters['date']) ? Carbon::parse($filters['date']) : now();
+
         $query = Room::query()
             ->with([
                 'roomCategory',
                 'bookings' => fn ($query) => $query
                     ->whereIn('status', [BookingStatusEnum::Reserved->value, BookingStatusEnum::CheckedIn->value])
-                    ->latest(),
+                    ->where('expected_check_in_at', '<', $date->copy()->endOfDay())
+                    ->where('expected_check_out_at', '>', $date->copy()->startOfDay())
+                    ->orderBy('expected_check_in_at'),
             ])
             ->filter($filters)
             ->latest();

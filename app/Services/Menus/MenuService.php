@@ -17,7 +17,7 @@ class MenuService
     public function paginate(array $filters = []): LengthAwarePaginator|Collection
     {
         $query = Menu::query()
-            ->with(['menuCategory', 'recipes.item.itemCategory', 'recipes.item.stockUnit', 'recipes.unit'])
+            ->with(['menuCategory', 'warehouse', 'recipes.item.itemCategory', 'recipes.item.stockUnit', 'recipes.unit'])
             ->filter($filters)
             ->latest();
 
@@ -38,6 +38,7 @@ class MenuService
 
             $menu = Menu::query()->updateOrCreate(['id' => $data['id'] ?? null], [
                 'menu_category_id' => $data['menu_category_id'],
+                'warehouse_id' => $data['warehouse_id'],
                 'name' => $data['name'],
                 'code' => $data['code'],
                 'description' => $data['description'] ?? null,
@@ -54,6 +55,7 @@ class MenuService
 
             $menu = $menu->refresh()->load([
                 'menuCategory',
+                'warehouse',
                 'recipes.item.itemCategory',
                 'recipes.item.stockUnit',
                 'recipes.unit',
@@ -88,6 +90,7 @@ class MenuService
 
             $menu = $menu->refresh()->load([
                 'menuCategory',
+                'warehouse',
                 'recipes.item.itemCategory',
                 'recipes.item.stockUnit',
                 'recipes.unit',

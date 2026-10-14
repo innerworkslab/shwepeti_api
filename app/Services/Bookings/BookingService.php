@@ -46,15 +46,23 @@ class BookingService
             /** @var Room $room */
             $room = Room::query()->lockForUpdate()->findOrFail($data['room_id']);
 
-            if ($room->status !== RoomStatusEnum::Available) {
-                throw ValidationException::withMessages([
-                    'room_id' => ['This room is not available for booking.'],
-                ]);
-            }
-
             $expectedCheckInAt = Carbon::parse($data['expected_check_in_at']);
             $expectedCheckOutAt = Carbon::parse($data['expected_check_out_at']);
             $chargeType = $data['charge_type'] ?? BookingChargeTypeEnum::Day->value;
+            $bookingType = $data['booking_type'] ?? null;
+            $checkInNow = filter_var($data['check_in_now'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $bookingType ??= $checkInNow ? BookingTypeEnum::WalkIn->value : BookingTypeEnum::Reservation->value;
+            $checkInNow = $bookingType === BookingTypeEnum::WalkIn->value || $checkInNow;
+
+            if ($bookingType === BookingTypeEnum::Reservation->value) {
+                $expectedCheckInAt = $this->reservationCheckInAt($expectedCheckInAt);
+                $expectedCheckOutAt = $this->reservationCheckOutAt($expectedCheckOutAt);
+            }
+
+            $this->ensureExpectedCheckoutAfterCheckin($expectedCheckInAt, $expectedCheckOutAt);
+            $this->ensureRoomCanAcceptBooking($room);
+            $this->ensureRoomHasNoBookingOverlap($room, $expectedCheckInAt, $expectedCheckOutAt);
+
             $nights = max(1, (int) ceil($expectedCheckInAt->diffInDays($expectedCheckOutAt)));
             $roomRate = (float) $room->price;
             $sessionRate = isset($data['session_rate']) ? (float) $data['session_rate'] : null;
@@ -65,10 +73,6 @@ class BookingService
             $depositAmount = (float) data_get($data, 'deposit.amount', 0);
             $paidAmount = min($depositAmount, $totalAmount);
             $balanceAmount = max(0, $totalAmount - $paidAmount);
-            $bookingType = $data['booking_type'] ?? null;
-            $checkInNow = filter_var($data['check_in_now'] ?? false, FILTER_VALIDATE_BOOLEAN);
-            $bookingType ??= $checkInNow ? BookingTypeEnum::WalkIn->value : BookingTypeEnum::Reservation->value;
-            $checkInNow = $bookingType === BookingTypeEnum::WalkIn->value || $checkInNow;
 
             if ($depositAmount > 0 && $bookingType !== BookingTypeEnum::Reservation->value) {
                 throw ValidationException::withMessages([
@@ -357,6 +361,69 @@ class BookingService
     private function nextBookingNo(): string
     {
         return 'BK-'.now()->format('YmdHis').'-'.str_pad((string) random_int(1, 999), 3, '0', STR_PAD_LEFT);
+    }
+
+    private function reservationCheckInAt(Carbon $date): Carbon
+    {
+        return $date->copy()->setTime(12, 30);
+    }
+
+    private function reservationCheckOutAt(Carbon $date): Carbon
+    {
+        return $date->copy()->setTime(11, 30);
+    }
+
+    private function ensureExpectedCheckoutAfterCheckin(Carbon $expectedCheckInAt, Carbon $expectedCheckOutAt): void
+    {
+        if ($expectedCheckOutAt->gt($expectedCheckInAt)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'expected_check_out_at' => ['The expected check out time must be after the expected check in time.'],
+        ]);
+    }
+
+    private function ensureRoomCanAcceptBooking(Room $room): void
+    {
+        if (in_array($room->status, [RoomStatusEnum::Available, RoomStatusEnum::Reserved], true)) {
+            return;
+        }
+
+        if ($room->status === RoomStatusEnum::Occupied && $this->roomHasActiveBooking($room)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'room_id' => ['This room is not available for booking.'],
+        ]);
+    }
+
+    private function roomHasActiveBooking(Room $room): bool
+    {
+        return Booking::query()
+            ->where('room_id', $room->id)
+            ->whereIn('status', [BookingStatusEnum::Reserved->value, BookingStatusEnum::CheckedIn->value])
+            ->exists();
+    }
+
+    private function ensureRoomHasNoBookingOverlap(Room $room, Carbon $expectedCheckInAt, Carbon $expectedCheckOutAt): void
+    {
+        $hasOverlap = Booking::query()
+            ->where('room_id', $room->id)
+            ->whereIn('status', [BookingStatusEnum::Reserved->value, BookingStatusEnum::CheckedIn->value])
+            ->where('expected_check_in_at', '<', $expectedCheckOutAt)
+            ->where('expected_check_out_at', '>', $expectedCheckInAt)
+            ->lockForUpdate()
+            ->exists();
+
+        if (! $hasOverlap) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'room_id' => ['This room already has a booking for the selected date and time.'],
+        ]);
     }
 
     private function nextPaymentNo(): string

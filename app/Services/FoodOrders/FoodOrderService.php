@@ -8,6 +8,8 @@ use App\Enums\RoomStatusEnum;
 use App\Http\Resources\Pos\FoodOrders\PosFoodOrderResource;
 use App\Models\Booking;
 use App\Models\FoodOrder;
+use App\Models\InventoryLedger;
+use App\Models\InventoryStockBalance;
 use App\Models\Menu;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -38,9 +40,15 @@ class FoodOrderService
             $this->ensureOrderableBooking($booking);
 
             $lines = collect($data['items'])->map(function (array $line): array {
-                $menu = Menu::query()->findOrFail($line['menu_id']);
+                $menu = Menu::query()->with('recipes')->findOrFail($line['menu_id']);
                 $unitPrice = (float) $menu->price;
                 $qty = (int) $line['qty'];
+
+                if ($menu->recipes->isNotEmpty() && blank($menu->warehouse_id)) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Menu {$menu->name} does not have a warehouse configured."],
+                    ]);
+                }
 
                 return [
                     'menu_id' => $menu->id,
@@ -76,14 +84,21 @@ class FoodOrderService
 
     public function updateStatus(FoodOrder $foodOrder, string $status, ?User $actor = null): PosFoodOrderResource
     {
-        $this->ensureStatusTransition($foodOrder, $status);
+        return DB::transaction(function () use ($foodOrder, $status, $actor): PosFoodOrderResource {
+            $this->ensureStatusTransition($foodOrder, $status);
 
-        $foodOrder->update([
-            'status' => $status,
-            'updated_by' => $actor?->id,
-        ]);
+            if ($status === FoodOrderStatusEnum::Preparing->value) {
+                $foodOrder->load(['items.menu.recipes']);
+                $this->postInventoryMovements($foodOrder, $actor);
+            }
 
-        return new PosFoodOrderResource($foodOrder->refresh()->load(['booking', 'room.roomCategory', 'items.menu.menuCategory']));
+            $foodOrder->update([
+                'status' => $status,
+                'updated_by' => $actor?->id,
+            ]);
+
+            return new PosFoodOrderResource($foodOrder->refresh()->load(['booking', 'room.roomCategory', 'items.menu.menuCategory']));
+        });
     }
 
     private function ensureOrderableBooking(Booking $booking): void
@@ -120,5 +135,77 @@ class FoodOrderService
     private function nextOrderNo(): string
     {
         return 'FO-'.now()->format('YmdHis').'-'.str_pad((string) random_int(1, 999), 3, '0', STR_PAD_LEFT);
+    }
+
+    private function postInventoryMovements(FoodOrder $foodOrder, ?User $actor = null): void
+    {
+        foreach ($foodOrder->items as $foodOrderItem) {
+            $foodOrderItem->loadMissing('menu.recipes');
+
+            foreach ($foodOrderItem->menu->recipes as $recipe) {
+                if (blank($foodOrderItem->menu->warehouse_id)) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Menu {$foodOrderItem->menu->name} does not have a warehouse configured."],
+                    ]);
+                }
+
+                $baseQuantity = (float) $recipe->base_quantity * $foodOrderItem->qty;
+                $balance = $this->stockBalance($recipe->item_id, $foodOrderItem->menu->warehouse_id);
+                $newQuantity = (float) $balance->quantity - $baseQuantity;
+
+                if ($newQuantity < 0) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Insufficient stock for  {$recipe->item->name} (Menu) in warehouse {$foodOrderItem->menu->warehouse->name}."],
+                    ]);
+                }
+
+                $balance->update([
+                    'quantity' => $this->decimal($newQuantity),
+                    'available_quantity' => $this->decimal($newQuantity - (float) $balance->reserved_quantity),
+                ]);
+
+                InventoryLedger::query()->create([
+                    'item_id' => $recipe->item_id,
+                    'warehouse_id' => $foodOrderItem->menu->warehouse_id,
+                    'transaction_type' => 'food_order',
+                    'reference_type' => $foodOrderItem->getMorphClass(),
+                    'reference_id' => $foodOrderItem->id,
+                    'quantity' => $this->decimal((float) $recipe->quantity * $foodOrderItem->qty),
+                    'unit_id' => $recipe->unit_id,
+                    'base_quantity' => $this->decimal(-1 * $baseQuantity),
+                    'unit_cost' => null,
+                    'total_cost' => null,
+                    'batch_no' => null,
+                    'expiry_date' => null,
+                    'balance_quantity' => $this->decimal($newQuantity),
+                    'transaction_date' => now(),
+                    'remark' => "Food order {$foodOrder->order_no}",
+                    'created_by' => $actor?->id,
+                ]);
+            }
+        }
+    }
+
+    private function stockBalance(int $itemId, int $warehouseId): InventoryStockBalance
+    {
+        InventoryStockBalance::query()->firstOrCreate([
+            'item_id' => $itemId,
+            'warehouse_id' => $warehouseId,
+        ], [
+            'quantity' => 0,
+            'reserved_quantity' => 0,
+            'available_quantity' => 0,
+        ]);
+
+        return InventoryStockBalance::query()
+            ->where('item_id', $itemId)
+            ->where('warehouse_id', $warehouseId)
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+
+    private function decimal(float $value): string
+    {
+        return number_format($value, 6, '.', '');
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services\Cashbooks;
 
+use App\Enums\CashbookTypeEnum;
 use App\Http\Resources\Cashbooks\CashbookResource;
 use App\Models\Cashbook;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -17,6 +18,24 @@ class CashbookService
 
         if (! isset($filters['page'])) {
             return $query->where('is_active', true)->get();
+        }
+
+        return $query->paginate((int) ($filters['per_page'] ?? 15));
+    }
+
+    public function paginateForPos(array $filters = []): LengthAwarePaginator|Collection
+    {
+        $query = Cashbook::query()
+            ->filter($filters)
+            ->whereIn('type', [
+                CashbookTypeEnum::PosCash->value,
+                CashbookTypeEnum::PosBank->value,
+            ])
+            ->where('is_active', true)
+            ->latest();
+
+        if (! isset($filters['page'])) {
+            return $query->get();
         }
 
         return $query->paginate((int) ($filters['per_page'] ?? 15));

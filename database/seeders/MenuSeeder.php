@@ -6,6 +6,7 @@ use App\Models\Item;
 use App\Models\Menu;
 use App\Models\MenuCategory;
 use App\Models\Unit;
+use App\Models\Warehouse;
 use App\Services\Inventory\InventoryDocumentService;
 use Illuminate\Database\Seeder;
 
@@ -20,6 +21,7 @@ class MenuSeeder extends Seeder
                 'category_code' => 'MAIN_DISHES',
                 'name' => 'Chicken Fried Rice',
                 'code' => 'CHICKEN_FRIED_RICE',
+                'warehouse_code' => 'KITCHEN',
                 'description' => 'Fried rice with chicken.',
                 'price' => 4500,
                 'recipes' => [
@@ -32,6 +34,7 @@ class MenuSeeder extends Seeder
                 'category_code' => 'MAIN_DISHES',
                 'name' => 'Chicken Rice',
                 'code' => 'CHICKEN_RICE',
+                'warehouse_code' => 'KITCHEN',
                 'description' => 'Steamed rice served with chicken.',
                 'price' => 4000,
                 'recipes' => [
@@ -44,6 +47,7 @@ class MenuSeeder extends Seeder
                 'category_code' => 'BEVERAGES',
                 'name' => 'Cola',
                 'code' => 'COLA',
+                'warehouse_code' => 'BAR',
                 'description' => 'Bottled cola.',
                 'price' => 1500,
                 'recipes' => [
@@ -54,6 +58,7 @@ class MenuSeeder extends Seeder
                 'category_code' => 'BEVERAGES',
                 'name' => 'Drinking Water',
                 'code' => 'DRINKING_WATER',
+                'warehouse_code' => 'BAR',
                 'description' => 'Bottled drinking water.',
                 'price' => 1000,
                 'recipes' => [
@@ -67,6 +72,7 @@ class MenuSeeder extends Seeder
                 'code' => $menuData['code'],
             ], [
                 'menu_category_id' => $this->categoryId($menuData['category_code']),
+                'warehouse_id' => $this->warehouseId($menuData['warehouse_code']),
                 'name' => $menuData['name'],
                 'description' => $menuData['description'],
                 'price' => $menuData['price'],
@@ -117,5 +123,10 @@ class MenuSeeder extends Seeder
     private function unitId(string $symbol): int
     {
         return Unit::query()->where('symbol', $symbol)->firstOrFail()->id;
+    }
+
+    private function warehouseId(string $code): int
+    {
+        return Warehouse::query()->where('code', $code)->firstOrFail()->id;
     }
 }

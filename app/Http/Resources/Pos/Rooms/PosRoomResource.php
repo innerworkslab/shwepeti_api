@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Pos\Rooms;
 
+use App\Enums\BookingStatusEnum;
 use App\Http\Resources\Concerns\FormatsDateTime;
 use App\Http\Resources\Pos\Bookings\PosBookingResource;
 use App\Http\Resources\RoomCategories\RoomCategoryResource;
@@ -17,6 +18,7 @@ class PosRoomResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // dd($this->bookings);
         return [
             'id' => $this->id,
             'name' => $this->name,
@@ -24,7 +26,18 @@ class PosRoomResource extends JsonResource
             'room_category' => RoomCategoryResource::make($this->whenLoaded('roomCategory')),
             'price' => $this->price,
             'status' => $this->status?->value,
-            'current_booking' => PosBookingResource::make($this->whenLoaded('bookings', fn () => $this->bookings->first())),
+            'current_booking' => PosBookingResource::make(
+                $this->whenLoaded(
+                    'bookings',
+                    fn() => $this->bookings
+                        ->whereIn('status', [
+                            BookingStatusEnum::Reserved,
+                            BookingStatusEnum::CheckedIn,
+                        ])
+                        ->first()
+                )
+            ),
+            'bookings' => PosBookingResource::collection($this->whenLoaded('bookings')),
             'updated_at' => $this->dateTime($this->updated_at),
         ];
     }

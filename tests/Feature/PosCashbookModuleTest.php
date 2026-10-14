@@ -16,33 +16,47 @@ class PosCashbookModuleTest extends TestCase
 
     public function test_it_lists_active_cashbooks_for_pos(): void
     {
-        $cash = $this->createCashbook([
+        $this->createCashbook([
             'code' => 'CASH',
             'name' => 'Main Cash',
             'type' => CashbookTypeEnum::Cash->value,
             'opening_balance' => 1000,
         ]);
 
-        $bank = $this->createCashbook([
+        $this->createCashbook([
             'code' => 'BANK',
             'name' => 'Main Bank',
             'type' => CashbookTypeEnum::Bank->value,
             'opening_balance' => 2000,
         ]);
 
+        $posCash = $this->createCashbook([
+            'code' => 'POS-CASH',
+            'name' => 'POS Cash',
+            'type' => CashbookTypeEnum::PosCash->value,
+            'opening_balance' => 3000,
+        ]);
+
+        $posBank = $this->createCashbook([
+            'code' => 'POS-BANK',
+            'name' => 'POS Bank',
+            'type' => CashbookTypeEnum::PosBank->value,
+            'opening_balance' => 4000,
+        ]);
+
         $this->createCashbook([
             'code' => 'INACTIVE',
             'name' => 'Inactive Cash',
-            'type' => CashbookTypeEnum::Cash->value,
+            'type' => CashbookTypeEnum::PosCash->value,
             'is_active' => false,
         ]);
 
         $this->withHeaders($this->posAuthHeaders())
-            ->getJson('/api/v1/pos/cashbooks?type=bank&page=1&perPage=1')
+            ->getJson('/api/v1/pos/cashbooks?type=pos_bank&page=1&perPage=1')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.id', $bank->id)
-            ->assertJsonPath('data.0.type', CashbookTypeEnum::Bank->value)
+            ->assertJsonPath('data.0.id', $posBank->id)
+            ->assertJsonPath('data.0.type', CashbookTypeEnum::PosBank->value)
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('meta.per_page', 1);
 
@@ -50,8 +64,10 @@ class PosCashbookModuleTest extends TestCase
             ->getJson('/api/v1/pos/cashbooks')
             ->assertOk()
             ->assertJsonCount(2, 'data')
-            ->assertJsonFragment(['id' => $bank->id])
-            ->assertJsonFragment(['id' => $cash->id])
+            ->assertJsonFragment(['id' => $posBank->id])
+            ->assertJsonFragment(['id' => $posCash->id])
+            ->assertJsonMissing(['code' => 'CASH'])
+            ->assertJsonMissing(['code' => 'BANK'])
             ->assertJsonMissing(['code' => 'INACTIVE']);
     }
 

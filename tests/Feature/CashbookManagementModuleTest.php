@@ -52,8 +52,8 @@ class CashbookManagementModuleTest extends TestCase
         $this->withHeaders($headers)->getJson("/api/v1/admin/cashbook-transactions?cashbook_id={$cashbookId}&transaction_type=expense&page=1")
             ->assertOk()
             ->assertJsonPath('meta.total', 1)
-            ->assertJsonPath('meta.opening_balance', '100000.00')
-            ->assertJsonPath('meta.closing_balance', '120000.00')
+            ->assertJsonPath('opening_balance', '100000.00')
+            ->assertJsonPath('closing_balance', '120000.00')
             ->assertJsonPath('data.0.remark', 'Office supplies');
 
         $this->assertDatabaseHas('cashbooks', [

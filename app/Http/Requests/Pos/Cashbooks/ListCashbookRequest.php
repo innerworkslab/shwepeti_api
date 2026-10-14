@@ -20,7 +20,10 @@ class ListCashbookRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:255'],
-            'type' => ['nullable', Rule::enum(CashbookTypeEnum::class)],
+            'type' => ['nullable', Rule::in([
+                CashbookTypeEnum::PosCash->value,
+                CashbookTypeEnum::PosBank->value,
+            ])],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];

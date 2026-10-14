@@ -20,6 +20,7 @@ class SaveMenuRequest extends FormRequest
         return [
             'id' => ['nullable', 'integer', 'exists:menus,id'],
             'menu_category_id' => ['required', 'integer', 'exists:menu_categories,id'],
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'name' => ['required', 'string', 'max:255'],
             'code' => [
                 'required',

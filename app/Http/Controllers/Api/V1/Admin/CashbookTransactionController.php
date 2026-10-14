@@ -23,7 +23,7 @@ class CashbookTransactionController extends Controller
         return ApiResponse::resource(
             'Cashbook ledger retrieved successfully.',
             CashbookTransactionResource::collection($transactions),
-            $this->cashbookTransactionService->summary($filters),
+            extra: $this->cashbookTransactionService->summary($filters),
         );
     }
 

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-#[Fillable(['menu_category_id', 'name', 'code', 'description', 'price', 'cost_price', 'image_url', 'is_available', 'is_active'])]
+#[Fillable(['menu_category_id', 'warehouse_id', 'name', 'code', 'description', 'price', 'cost_price', 'image_url', 'is_available', 'is_active'])]
 class Menu extends Model implements AuditableContract
 {
     use Auditable;
@@ -28,6 +28,11 @@ class Menu extends Model implements AuditableContract
     public function menuCategory(): BelongsTo
     {
         return $this->belongsTo(MenuCategory::class);
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     public function recipes(): HasMany
@@ -51,6 +56,7 @@ class Menu extends Model implements AuditableContract
                 }),
             )
             ->when($filters['menu_category_id'] ?? null, fn (Builder $query, mixed $categoryId) => $query->where('menu_category_id', $categoryId))
+            ->when($filters['warehouse_id'] ?? null, fn (Builder $query, mixed $warehouseId) => $query->where('warehouse_id', $warehouseId))
             ->when(
                 array_key_exists('is_available', $filters),
                 fn (Builder $query) => $query->where('is_available', filter_var($filters['is_available'], FILTER_VALIDATE_BOOLEAN)),

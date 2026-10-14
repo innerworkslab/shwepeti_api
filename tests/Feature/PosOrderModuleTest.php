@@ -7,6 +7,8 @@ use App\Enums\ServiceOrderStatusEnum;
 use App\Enums\ServiceOrderTypeEnum;
 use App\Enums\UserPortalAccessEnum;
 use App\Enums\UserRoleEnum;
+use App\Models\InventoryLedger;
+use App\Models\InventoryStockBalance;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Menu;
@@ -16,6 +18,7 @@ use App\Models\RoomCategory;
 use App\Models\Unit;
 use App\Models\UnitGroup;
 use App\Models\User;
+use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -76,6 +79,77 @@ class PosOrderModuleTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('data.status', FoodOrderStatusEnum::Preparing->value);
+    }
+
+    public function test_food_order_consumes_menu_recipe_inventory_from_menu_warehouse(): void
+    {
+        $warehouse = Warehouse::query()->create(['code' => 'KITCHEN', 'name' => 'Kitchen Store']);
+        $unitGroup = UnitGroup::query()->create(['name' => 'Weight', 'slug' => 'weight']);
+        $kg = Unit::query()->create(['unit_group_id' => $unitGroup->id, 'name' => 'kg', 'symbol' => 'kg', 'is_base' => true]);
+        $category = ItemCategory::query()->create(['name' => 'Raw Materials', 'slug' => 'raw-materials', 'code' => 'RAW_MATERIALS']);
+        $item = Item::query()->create([
+            'item_category_id' => $category->id,
+            'name' => 'Chicken',
+            'code' => 'CHICKEN',
+            'stock_unit_id' => $kg->id,
+            'is_active' => true,
+        ]);
+        $menu = $this->createMenu([
+            'warehouse_id' => $warehouse->id,
+            'price' => 5000,
+        ]);
+        $menu->recipes()->create([
+            'item_id' => $item->id,
+            'unit_id' => $kg->id,
+            'quantity' => 1,
+            'base_quantity' => 1,
+        ]);
+
+        InventoryStockBalance::query()->create([
+            'item_id' => $item->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 5,
+            'reserved_quantity' => 0,
+            'available_quantity' => 5,
+        ]);
+
+        $headers = $this->posAuthHeaders();
+        [$bookingId] = $this->createCheckedInBooking($headers);
+
+        $foodOrderId = $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/food-orders', [
+                'booking_id' => $bookingId,
+                'items' => [
+                    ['menu_id' => $menu->id, 'qty' => 2],
+                ],
+            ])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->assertSame(0, InventoryLedger::query()->where('transaction_type', 'food_order')->count());
+
+        $this->withHeaders($headers)
+            ->postJson("/api/v1/pos/food-orders/{$foodOrderId}/status", [
+                'status' => FoodOrderStatusEnum::Preparing->value,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', FoodOrderStatusEnum::Preparing->value);
+
+        $this->assertDatabaseHas('inventory_stock_balances', [
+            'item_id' => $item->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 3,
+            'available_quantity' => 3,
+        ]);
+        $this->assertDatabaseHas('inventory_ledgers', [
+            'item_id' => $item->id,
+            'warehouse_id' => $warehouse->id,
+            'transaction_type' => 'food_order',
+            'reference_type' => 'food_order_item',
+            'base_quantity' => -2,
+            'balance_quantity' => 3,
+        ]);
+        $this->assertSame(1, InventoryLedger::query()->where('transaction_type', 'food_order')->count());
     }
 
     public function test_it_blocks_food_order_cancel_after_preparing(): void
@@ -252,9 +326,14 @@ class PosOrderModuleTest extends TestCase
             'code' => fake()->unique()->bothify('MC-###'),
             'is_active' => true,
         ]);
+        $warehouseId = $overrides['warehouse_id'] ?? Warehouse::query()->create([
+            'code' => fake()->unique()->bothify('WH-###'),
+            'name' => fake()->unique()->words(2, true),
+        ])->id;
 
         return Menu::query()->create(array_merge([
             'menu_category_id' => $category->id,
+            'warehouse_id' => $warehouseId,
             'name' => fake()->unique()->words(2, true),
             'code' => fake()->unique()->bothify('MENU-###'),
             'price' => 5000,
