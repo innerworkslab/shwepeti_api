@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\SupplierApPayments\SaveSupplierApPaymentRequest;
 use App\Http\Requests\SupplierApPayments\UpdateSupplierApPaymentStatusRequest;
 use App\Http\Resources\SupplierApPayments\SupplierApPaymentResource;
+use App\Models\Supplier;
 use App\Models\SupplierApPayment;
 use App\Services\SupplierApPayments\SupplierApPaymentService;
 use App\Support\ApiResponse;
@@ -19,6 +20,16 @@ class SupplierApPaymentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $payments = $this->supplierApPaymentService->paginate($request->only(['search', 'supplier_id', 'cashbook_id', 'status', 'date_from', 'date_to', 'page', 'per_page']));
+
+        return ApiResponse::resource('Supplier AP payments retrieved successfully.', SupplierApPaymentResource::collection($payments));
+    }
+
+    public function bySupplier(Request $request, Supplier $supplier): JsonResponse
+    {
+        $payments = $this->supplierApPaymentService->paginate(array_merge(
+            $request->only(['search', 'cashbook_id', 'status', 'date_from', 'date_to', 'page', 'per_page']),
+            ['supplier_id' => $supplier->id],
+        ));
 
         return ApiResponse::resource('Supplier AP payments retrieved successfully.', SupplierApPaymentResource::collection($payments));
     }

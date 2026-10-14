@@ -2,9 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Enums\CashbookTypeEnum;
+use App\Enums\SupplierApPaymentStatusEnum;
+use App\Enums\SupplierTypeEnum;
 use App\Enums\UserRoleEnum;
+use App\Models\Cashbook;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\Supplier;
+use App\Models\SupplierApPayment;
 use App\Models\Unit;
 use App\Models\UnitGroup;
 use App\Models\User;
@@ -109,6 +115,72 @@ class SupplierPayableModuleTest extends TestCase
         $this->assertDatabaseHas('cashbooks', ['id' => $cashbookId, 'current_balance' => 4350]);
         $this->assertDatabaseHas('supplier_ap_ledgers', ['supplier_id' => $supplierId, 'transaction_type' => 'payment', 'amount' => 250]);
         $this->assertDatabaseCount('cashbook_transactions', 2);
+    }
+
+    public function test_it_lists_supplier_ap_payments_by_supplier(): void
+    {
+        $headers = $this->authHeaders();
+        $supplier = $this->createSupplier('SUP-001');
+        $otherSupplier = $this->createSupplier('SUP-002');
+        $cashbook = $this->createCashbook();
+
+        SupplierApPayment::query()->create([
+            'reference_no' => 'SAP-A-001',
+            'supplier_id' => $supplier->id,
+            'cashbook_id' => $cashbook->id,
+            'amount' => 100,
+            'payment_date' => '2026-09-25 09:00:00',
+            'status' => SupplierApPaymentStatusEnum::Draft->value,
+        ]);
+
+        $postedPayment = SupplierApPayment::query()->create([
+            'reference_no' => 'SAP-A-002',
+            'supplier_id' => $supplier->id,
+            'cashbook_id' => $cashbook->id,
+            'amount' => 200,
+            'payment_date' => '2026-09-26 09:00:00',
+            'status' => SupplierApPaymentStatusEnum::Posted->value,
+        ]);
+
+        SupplierApPayment::query()->create([
+            'reference_no' => 'SAP-B-001',
+            'supplier_id' => $otherSupplier->id,
+            'cashbook_id' => $cashbook->id,
+            'amount' => 300,
+            'payment_date' => '2026-09-27 09:00:00',
+            'status' => SupplierApPaymentStatusEnum::Posted->value,
+        ]);
+
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/admin/suppliers/{$supplier->id}/ap-payments?status=posted&page=1&perPage=10")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $postedPayment->id)
+            ->assertJsonPath('data.0.supplier_id', $supplier->id)
+            ->assertJsonPath('data.0.status', SupplierApPaymentStatusEnum::Posted->value)
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonMissing(['reference_no' => 'SAP-B-001']);
+    }
+
+    private function createSupplier(string $supplierCode): Supplier
+    {
+        return Supplier::query()->create([
+            'supplier_code' => $supplierCode,
+            'name' => fake()->unique()->company(),
+            'supplier_type' => SupplierTypeEnum::WHOLESALE->value,
+            'is_active' => true,
+        ]);
+    }
+
+    private function createCashbook(): Cashbook
+    {
+        return Cashbook::query()->create([
+            'code' => fake()->unique()->bothify('CB-###'),
+            'name' => fake()->unique()->words(2, true),
+            'type' => CashbookTypeEnum::Cash->value,
+            'opening_balance' => 1000,
+            'is_active' => true,
+        ]);
     }
 
     /**
