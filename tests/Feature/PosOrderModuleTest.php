@@ -21,11 +21,63 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class PosOrderModuleTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_food_order_includes_frontend_calculated_charges(): void
+    {
+        $menu = $this->createMenu(['price' => 150000]);
+        $headers = $this->posAuthHeaders();
+        [$bookingId] = $this->createCheckedInBooking($headers);
+
+        $response = $this->withHeaders($headers)->postJson('/api/v1/pos/food-orders', [
+            'booking_id' => $bookingId,
+            'items' => [['menu_id' => $menu->id, 'qty' => 1]],
+            'tax_percentage' => 10,
+            'tax_amount' => 15000,
+            'service_charge_percentage' => 5,
+            'service_charge_amount' => 7500,
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.tax_percentage', '10.00')
+            ->assertJsonPath('data.tax_amount', '15000.00')
+            ->assertJsonPath('data.service_charge_percentage', '5.00')
+            ->assertJsonPath('data.service_charge_amount', '7500.00')
+            ->assertJsonPath('data.total_amount', '172500.00');
+        $this->assertDatabaseHas('food_orders', [
+            'id' => $response->json('data.id'),
+            'tax_percentage' => 10,
+            'tax_amount' => 15000,
+            'service_charge_percentage' => 5,
+            'service_charge_amount' => 7500,
+            'total_amount' => 172500,
+        ]);
+    }
+
+    #[TestWith([['tax_percentage' => 101, 'tax_amount' => 0], 'tax_percentage'])]
+    #[TestWith([['service_charge_percentage' => -1, 'service_charge_amount' => 0], 'service_charge_percentage'])]
+    #[TestWith([['tax_percentage' => 10], 'tax_amount'])]
+    #[TestWith([['service_charge_percentage' => 5], 'service_charge_amount'])]
+    #[TestWith([['service_charge_amount' => -1], 'service_charge_amount'])]
+    public function test_food_order_rejects_invalid_charges(array $charges, string $errorField): void
+    {
+        $menu = $this->createMenu();
+        $headers = $this->posAuthHeaders();
+        [$bookingId] = $this->createCheckedInBooking($headers);
+
+        $this->withHeaders($headers)->postJson('/api/v1/pos/food-orders', [
+            'booking_id' => $bookingId,
+            'items' => [['menu_id' => $menu->id, 'qty' => 1]],
+            ...$charges,
+        ])->assertUnprocessable()->assertJsonValidationErrors($errorField);
+
+        $this->assertDatabaseMissing('food_orders', ['booking_id' => $bookingId]);
+    }
 
     public function test_it_creates_food_order_from_menus(): void
     {

@@ -62,6 +62,7 @@ class FoodOrderService
             $subtotal = (float) $lines->sum('total');
             $discountAmount = (float) ($data['discount_amount'] ?? 0);
             $taxAmount = (float) ($data['tax_amount'] ?? 0);
+            $serviceChargeAmount = (float) ($data['service_charge_amount'] ?? 0);
 
             $foodOrder = FoodOrder::query()->create([
                 'booking_id' => $booking->id,
@@ -71,7 +72,10 @@ class FoodOrderService
                 'subtotal' => $subtotal,
                 'discount_amount' => $discountAmount,
                 'tax_amount' => $taxAmount,
-                'total_amount' => max(0, $subtotal - $discountAmount + $taxAmount),
+                'tax_percentage' => $data['tax_percentage'] ?? 0,
+                'service_charge_percentage' => $data['service_charge_percentage'] ?? 0,
+                'service_charge_amount' => $serviceChargeAmount,
+                'total_amount' => max(0, $subtotal - $discountAmount + $taxAmount + $serviceChargeAmount),
                 'note' => $data['note'] ?? null,
                 'created_by' => $actor?->id,
             ]);

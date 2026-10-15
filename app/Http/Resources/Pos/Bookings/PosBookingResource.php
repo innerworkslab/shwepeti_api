@@ -48,6 +48,10 @@ class PosBookingResource extends JsonResource
             'subtotal' => $this->subtotal,
             'discount_amount' => $this->discount_amount,
             'tax_amount' => $this->tax_amount,
+            'tax_percentage' => $this->tax_percentage,
+            'service_charge_percentage' => $this->service_charge_percentage,
+            'service_charge_amount' => $this->service_charge_amount,
+
             'room_total_amount' => $this->total_amount,
             'food_order_amount' => number_format($foodOrderAmount, 2, '.', ''),
             'service_order_amount' => number_format($serviceOrderAmount, 2, '.', ''),

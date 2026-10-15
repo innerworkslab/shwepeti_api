@@ -18,6 +18,7 @@ use App\Models\Room;
 use App\Models\RoomCategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class PosBookingModuleTest extends TestCase
@@ -475,6 +476,109 @@ class PosBookingModuleTest extends TestCase
             'id' => $room->id,
             'status' => RoomStatusEnum::Dirty->value,
         ]);
+    }
+
+    #[TestWith([172500, true])]
+    #[TestWith([150000, false])]
+    public function test_checkout_includes_frontend_calculated_charges(int $paymentAmount, bool $succeeds): void
+    {
+        $room = $this->createAvailableRoom([
+            'price' => 150000,
+        ]);
+        $headers = $this->posAuthHeaders();
+        $cashbook = $this->createCashbook();
+
+        $bookingId = $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'guest_name' => 'Checkout Guest',
+                'expected_check_in_at' => now()->toDateTimeString(),
+                'expected_check_out_at' => now()->addDay()->toDateTimeString(),
+                'check_in_now' => true,
+            ])->json('data.id');
+
+        $response = $this->withHeaders($headers)
+            ->postJson("/api/v1/pos/bookings/{$bookingId}/checkout", [
+                'cashbook_id' => $cashbook->id,
+                'payment_method' => PaymentMethodEnum::Cash->value,
+                'amount' => $paymentAmount,
+                'tax_percentage' => 10,
+                'tax_amount' => 15000,
+                'service_charge_percentage' => 5,
+                'service_charge_amount' => 7500,
+            ]);
+
+        if (! $succeeds) {
+            $response->assertUnprocessable()->assertJsonValidationErrors('amount');
+            $this->assertDatabaseHas('bookings', [
+                'id' => $bookingId,
+                'status' => BookingStatusEnum::CheckedIn->value,
+                'tax_amount' => 0,
+                'service_charge_amount' => 0,
+                'total_amount' => 150000,
+            ]);
+            $this->assertDatabaseMissing('booking_payments', ['booking_id' => $bookingId]);
+            $this->assertDatabaseHas('cashbooks', ['id' => $cashbook->id, 'current_balance' => 0]);
+
+            return;
+        }
+
+        $response->assertOk()
+            ->assertJsonPath('data.tax_percentage', '10.00')
+            ->assertJsonPath('data.tax_amount', '15000.00')
+            ->assertJsonPath('data.service_charge_percentage', '5.00')
+            ->assertJsonPath('data.service_charge_amount', '7500.00')
+            ->assertJsonPath('data.total_amount', '172500.00')
+            ->assertJsonPath('data.balance_amount', '0.00');
+        $this->assertDatabaseHas('bookings', [
+            'id' => $bookingId,
+            'tax_percentage' => 10,
+            'service_charge_percentage' => 5,
+            'total_amount' => 172500,
+            'paid_amount' => 172500,
+        ]);
+        $this->assertDatabaseHas('cashbooks', ['id' => $cashbook->id, 'current_balance' => 172500]);
+    }
+
+    public function test_checkout_preserves_charges_saved_on_booking(): void
+    {
+        $room = $this->createAvailableRoom([
+            'price' => 150000,
+        ]);
+        $headers = $this->posAuthHeaders();
+        $cashbook = $this->createCashbook();
+
+        $bookingId = $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'guest_name' => 'Checkout Guest',
+                'expected_check_in_at' => now()->toDateTimeString(),
+                'expected_check_out_at' => now()->addDay()->toDateTimeString(),
+                'check_in_now' => true,
+                'tax_percentage' => 10,
+                'tax_amount' => 15000,
+                'service_charge_percentage' => 5,
+                'service_charge_amount' => 7500,
+            ])->json('data.id');
+
+        $this->assertDatabaseHas('bookings', [
+            'id' => $bookingId,
+            'tax_percentage' => 10,
+            'service_charge_percentage' => 5,
+            'total_amount' => 172500,
+            'balance_amount' => 172500,
+        ]);
+
+        $this->withHeaders($headers)
+            ->postJson("/api/v1/pos/bookings/{$bookingId}/checkout", [
+                'cashbook_id' => $cashbook->id,
+                'payment_method' => PaymentMethodEnum::Cash->value,
+                'amount' => 172500,
+            ])->assertOk()
+            ->assertJsonPath('data.tax_amount', '15000.00')
+            ->assertJsonPath('data.service_charge_amount', '7500.00')
+            ->assertJsonPath('data.total_amount', '172500.00')
+            ->assertJsonPath('data.balance_amount', '0.00');
     }
 
     public function test_it_checks_out_with_checkout_payment(): void

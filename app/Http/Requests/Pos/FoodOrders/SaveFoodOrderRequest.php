@@ -24,7 +24,10 @@ class SaveFoodOrderRequest extends FormRequest
             'items.*.qty' => ['required', 'integer', 'min:1'],
             'items.*.note' => ['nullable', 'string'],
             'discount_amount' => ['sometimes', 'numeric', 'min:0'],
-            'tax_amount' => ['sometimes', 'numeric', 'min:0'],
+            'tax_percentage' => ['sometimes', 'numeric', 'between:0,100'],
+            'tax_amount' => ['required_with:tax_percentage', 'numeric', 'min:0'],
+            'service_charge_percentage' => ['sometimes', 'numeric', 'between:0,100'],
+            'service_charge_amount' => ['required_with:service_charge_percentage', 'numeric', 'min:0'],
             'note' => ['nullable', 'string'],
         ];
     }

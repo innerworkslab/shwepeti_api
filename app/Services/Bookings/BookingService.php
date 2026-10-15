@@ -69,7 +69,8 @@ class BookingService
             $subtotal = $chargeType === BookingChargeTypeEnum::Session->value ? (float) $sessionRate : $roomRate * $nights;
             $discountAmount = (float) ($data['discount_amount'] ?? 0);
             $taxAmount = (float) ($data['tax_amount'] ?? 0);
-            $totalAmount = max(0, $subtotal - $discountAmount + $taxAmount);
+            $serviceChargeAmount = (float) ($data['service_charge_amount'] ?? 0);
+            $totalAmount = max(0, $subtotal - $discountAmount + $taxAmount + $serviceChargeAmount);
             $depositAmount = (float) data_get($data, 'deposit.amount', 0);
             $paidAmount = min($depositAmount, $totalAmount);
             $balanceAmount = max(0, $totalAmount - $paidAmount);
@@ -105,6 +106,9 @@ class BookingService
                 'subtotal' => $subtotal,
                 'discount_amount' => $discountAmount,
                 'tax_amount' => $taxAmount,
+                'tax_percentage' => $data['tax_percentage'] ?? 0,
+                'service_charge_percentage' => $data['service_charge_percentage'] ?? 0,
+                'service_charge_amount' => $serviceChargeAmount,
                 'total_amount' => $totalAmount,
                 'paid_amount' => $paidAmount,
                 'balance_amount' => $balanceAmount,
@@ -201,6 +205,17 @@ class BookingService
                     'booking' => ['Only checked-in bookings can be checked out.'],
                 ]);
             }
+
+            $booking->fill(collect($data)->only([
+                'tax_percentage',
+                'tax_amount',
+                'service_charge_percentage',
+                'service_charge_amount',
+            ])->all());
+            $booking->total_amount = max(0,
+                (float) $booking->subtotal - (float) $booking->discount_amount
+                + (float) $booking->tax_amount + (float) $booking->service_charge_amount
+            );
 
             $amount = (float) $data['amount'];
             $balanceAmount = $this->balanceAmount($booking);

@@ -32,6 +32,9 @@ return new class extends Migration
             $table->decimal('subtotal', 18, 2)->default(0);
             $table->decimal('discount_amount', 18, 2)->default(0);
             $table->decimal('tax_amount', 18, 2)->default(0);
+            $table->decimal('tax_percentage', 5, 2)->default(0);
+            $table->decimal('service_charge_percentage', 5, 2)->default(0);
+            $table->decimal('service_charge_amount', 18, 2)->default(0);
             $table->decimal('total_amount', 18, 2)->default(0);
             $table->decimal('paid_amount', 18, 2)->default(0);
             $table->decimal('balance_amount', 18, 2)->default(0);

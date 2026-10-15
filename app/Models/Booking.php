@@ -34,6 +34,10 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
     'subtotal',
     'discount_amount',
     'tax_amount',
+    'tax_percentage',
+    'service_charge_percentage',
+    'service_charge_amount',
+
     'total_amount',
     'paid_amount',
     'balance_amount',
@@ -64,6 +68,10 @@ class Booking extends Model implements AuditableContract
             'subtotal' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'tax_amount' => 'decimal:2',
+            'tax_percentage' => 'decimal:2',
+            'service_charge_percentage' => 'decimal:2',
+            'service_charge_amount' => 'decimal:2',
+
             'total_amount' => 'decimal:2',
             'paid_amount' => 'decimal:2',
             'balance_amount' => 'decimal:2',

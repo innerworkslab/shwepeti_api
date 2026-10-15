@@ -23,6 +23,10 @@ class CheckoutBookingRequest extends FormRequest
             'payment_method' => ['required', Rule::in(PaymentMethodEnum::values())],
             'amount' => ['required', 'numeric', 'min:0'],
             'paid_at' => ['nullable', 'date'],
+            'tax_percentage' => ['sometimes', 'numeric', 'between:0,100'],
+            'tax_amount' => ['required_with:tax_percentage', 'numeric', 'min:0'],
+            'service_charge_percentage' => ['sometimes', 'numeric', 'between:0,100'],
+            'service_charge_amount' => ['required_with:service_charge_percentage', 'numeric', 'min:0'],
             'note' => ['nullable', 'string'],
         ];
     }

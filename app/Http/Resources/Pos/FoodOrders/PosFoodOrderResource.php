@@ -28,6 +28,10 @@ class PosFoodOrderResource extends JsonResource
             'subtotal' => $this->subtotal,
             'discount_amount' => $this->discount_amount,
             'tax_amount' => $this->tax_amount,
+            'tax_percentage' => $this->tax_percentage,
+            'service_charge_percentage' => $this->service_charge_percentage,
+            'service_charge_amount' => $this->service_charge_amount,
+
             'total_amount' => $this->total_amount,
             'note' => $this->note,
             'items' => PosFoodOrderItemResource::collection($this->whenLoaded('items')),
