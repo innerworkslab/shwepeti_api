@@ -2,10 +2,9 @@
 
 namespace App\Http\Requests\FixedAssets;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class SaveFixedAssetRequest extends FormRequest
+class SaveFixedAssetRequest extends UpdateFixedAssetDepreciationRequest
 {
     public function authorize(): bool
     {
@@ -15,6 +14,8 @@ class SaveFixedAssetRequest extends FormRequest
     public function rules(): array
     {
         return [
+            ...parent::rules(),
+            'depreciation_enabled' => ['sometimes', 'boolean'],
             'id' => ['nullable', 'integer', 'exists:fixed_assets,id'],
             'reference_no' => ['nullable', 'string', 'max:255', Rule::unique('fixed_assets', 'reference_no')->ignore($this->input('id'))],
             'asset_code' => ['required', 'string', 'max:255', Rule::unique('fixed_assets', 'asset_code')->ignore($this->input('id'))],

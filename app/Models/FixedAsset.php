@@ -5,26 +5,39 @@ namespace App\Models;
 use App\Enums\FixedAssetStatusEnum;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
-#[Fillable(['reference_no', 'asset_code', 'asset_category_id', 'cashbook_id', 'name', 'serial_number', 'location', 'purchase_date', 'purchase_amount', 'warranty_expiry_date', 'documents', 'status', 'remark', 'created_by'])]
+#[Fillable(['reference_no', 'asset_code', 'asset_category_id', 'cashbook_id', 'name', 'serial_number', 'location', 'purchase_date', 'purchase_amount', 'warranty_expiry_date', 'documents', 'status', 'remark', 'created_by', 'depreciation_enabled', 'depreciation_start_date', 'useful_life_months', 'residual_value'])]
 class FixedAsset extends Model implements AuditableContract
 {
     use Auditable;
+    use HasFactory;
 
     protected function casts(): array
     {
         return [
+            'depreciation_enabled' => 'boolean',
+            'depreciation_start_date' => 'date',
+            'useful_life_months' => 'integer',
+            'residual_value' => 'decimal:2',
+            'accumulated_depreciation' => 'decimal:2',
             'purchase_date' => 'datetime',
             'purchase_amount' => 'decimal:2',
             'warranty_expiry_date' => 'date',
             'documents' => 'array',
             'status' => FixedAssetStatusEnum::class,
         ];
+    }
+
+    public function depreciations(): HasMany
+    {
+        return $this->hasMany(FixedAssetDepreciation::class);
     }
 
     public function assetCategory(): BelongsTo

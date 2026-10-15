@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FixedAssets\SaveFixedAssetRequest;
+use App\Http\Requests\FixedAssets\UpdateFixedAssetDepreciationRequest;
 use App\Http\Requests\FixedAssets\UpdateFixedAssetStatusRequest;
+use App\Http\Resources\FixedAssets\FixedAssetDepreciationResource;
 use App\Http\Resources\FixedAssets\FixedAssetResource;
 use App\Models\FixedAsset;
+use App\Services\FixedAssets\FixedAssetDepreciationService;
 use App\Services\FixedAssets\FixedAssetService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +39,20 @@ class FixedAssetController extends Controller
     {
         return ApiResponse::resource('Fixed asset retrieved successfully.', FixedAssetResource::make(
             $fixedAsset->load(['assetCategory', 'cashbook', 'cashbookTransaction', 'creator']),
+        ));
+    }
+
+    public function depreciationSettings(UpdateFixedAssetDepreciationRequest $request, FixedAsset $fixedAsset, FixedAssetDepreciationService $service): JsonResponse
+    {
+        return ApiResponse::resource('Depreciation settings saved successfully.', FixedAssetResource::make(
+            $service->configure($fixedAsset, $request->validated()),
+        ));
+    }
+
+    public function depreciations(FixedAsset $fixedAsset): JsonResponse
+    {
+        return ApiResponse::resource('Depreciation history retrieved successfully.', FixedAssetDepreciationResource::collection(
+            $fixedAsset->depreciations()->latest('period')->paginate(15),
         ));
     }
 

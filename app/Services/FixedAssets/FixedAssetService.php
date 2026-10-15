@@ -17,6 +17,7 @@ use Illuminate\Validation\ValidationException;
 class FixedAssetService
 {
     public function __construct(
+        private readonly FixedAssetDepreciationService $depreciationService,
         private readonly InventoryDocumentService $inventoryDocumentService,
         private readonly CashbookTransactionService $cashbookTransactionService,
     ) {}
@@ -40,7 +41,7 @@ class FixedAssetService
     {
         return DB::transaction(function () use ($data, $actor): FixedAssetResource {
             if (filled($data['id'] ?? null)) {
-                $existing = FixedAsset::query()->findOrFail($data['id']);
+                $existing = FixedAsset::query()->lockForUpdate()->findOrFail($data['id']);
 
                 if ($existing->status !== FixedAssetStatusEnum::Draft) {
                     throw ValidationException::withMessages([
@@ -73,6 +74,17 @@ class FixedAssetService
 
             $fixedAsset = FixedAsset::query()->updateOrCreate(['id' => $data['id'] ?? null], $values);
 
+            if (array_key_exists('depreciation_enabled', $data)) {
+                $fixedAsset = $this->depreciationService->configure($fixedAsset, $data);
+            } elseif ($fixedAsset->depreciation_enabled) {
+                $fixedAsset = $this->depreciationService->configure($fixedAsset, [
+                    'depreciation_enabled' => true,
+                    'depreciation_start_date' => $fixedAsset->depreciation_start_date->format('Y-m-d'),
+                    'useful_life_months' => $fixedAsset->useful_life_months,
+                    'residual_value' => $fixedAsset->residual_value,
+                ]);
+            }
+
             return new FixedAssetResource($fixedAsset->refresh()->load($this->relations()));
         });
     }
@@ -80,6 +92,8 @@ class FixedAssetService
     public function delete(FixedAsset $fixedAsset): void
     {
         DB::transaction(function () use ($fixedAsset): void {
+            $fixedAsset = FixedAsset::query()->whereKey($fixedAsset->id)->lockForUpdate()->firstOrFail();
+
             if ($fixedAsset->status !== FixedAssetStatusEnum::Draft) {
                 throw ValidationException::withMessages([
                     'id' => ['Only draft fixed assets can be deleted.'],

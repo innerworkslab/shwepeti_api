@@ -19,6 +19,11 @@ return new class extends Migration
             $table->string('location')->nullable();
             $table->dateTime('purchase_date');
             $table->decimal('purchase_amount', 18, 2);
+            $table->boolean('depreciation_enabled')->default(false);
+            $table->date('depreciation_start_date')->nullable();
+            $table->unsignedInteger('useful_life_months')->nullable();
+            $table->decimal('residual_value', 18, 2)->default(0);
+            $table->decimal('accumulated_depreciation', 18, 2)->default(0);
             $table->date('warranty_expiry_date')->nullable();
             $table->json('documents')->nullable();
             $table->string('status')->default('draft')->index();
@@ -28,6 +33,7 @@ return new class extends Migration
 
             $table->index(['asset_category_id', 'purchase_date']);
             $table->index(['cashbook_id', 'purchase_date']);
+            $table->index(['status', 'depreciation_enabled']);
         });
     }
 

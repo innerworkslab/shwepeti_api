@@ -83,6 +83,8 @@ Route::prefix('v1/admin')->group(function (): void {
             Route::apiResource('asset-categories', AssetCategoryController::class)->except(['update']);
             Route::post('asset-categories/{assetCategory}/toggle-active', [AssetCategoryController::class, 'toggleActive']);
             Route::apiResource('fixed-assets', FixedAssetController::class)->except(['update']);
+            Route::post('fixed-assets/{fixedAsset}/depreciation-settings', [FixedAssetController::class, 'depreciationSettings']);
+            Route::get('fixed-assets/{fixedAsset}/depreciations', [FixedAssetController::class, 'depreciations']);
             Route::post('fixed-assets/{fixedAsset}/status', [FixedAssetController::class, 'status']);
             Route::apiResource('suppliers', SupplierController::class)->except(['update']);
             Route::get('suppliers/{supplier}/ap-payments', [SupplierApPaymentController::class, 'bySupplier']);
