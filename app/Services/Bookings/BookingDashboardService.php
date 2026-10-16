@@ -32,7 +32,6 @@ class BookingDashboardService
             ->flatMap(fn (RoomCategory $category) => $category->rooms->pluck('id'))
             ->values()
             ->all();
-
         $bookings = Booking::query()
             ->with('room.roomCategory')
             ->whereIn('room_id', $roomIds)
@@ -83,11 +82,12 @@ class BookingDashboardService
                     'name' => $room->name,
                     'status' => $room->status?->value,
                     'price' => $room->price,
-                    'bookings' => ($bookings->get($room->id) ?? collect())
-                        ->map(fn (Booking $booking) => $this->bookingPayload($booking))
-                        ->values()
-                        ->all(),
                 ])
+                ->values()
+                ->all(),
+            'bookings' => $rooms
+                ->flatMap(fn ($room) => $bookings->get($room->id) ?? collect())
+                ->map(fn (Booking $booking) => $this->bookingPayload($booking))
                 ->values()
                 ->all(),
         ];
@@ -121,20 +121,13 @@ class BookingDashboardService
     private function bookingPayload(Booking $booking): array
     {
         return [
-            'id' => $booking->id,
-            'booking_no' => $booking->booking_no,
-            'guest_name' => $booking->guest_name,
-            'guest_phone' => $booking->guest_phone,
-            'booking_type' => $booking->booking_type?->value,
-            'charge_type' => $booking->charge_type?->value,
-            'status' => $booking->status?->value,
-            'expected_check_in_at' => $booking->expected_check_in_at?->toDateTimeString(),
-            'expected_check_out_at' => $booking->expected_check_out_at?->toDateTimeString(),
-            'checked_in_at' => $booking->checked_in_at?->toDateTimeString(),
-            'checked_out_at' => $booking->checked_out_at?->toDateTimeString(),
-            'total_amount' => $booking->total_amount,
-            'paid_amount' => $booking->paid_amount,
-            'balance_amount' => $booking->balance_amount,
+            'roomId' => (string) $booking->room_id,
+            'guestName' => $booking->guest_name,
+            'start_date_time' => $booking->expected_check_in_at?->format('Y-m-d H:i'),
+            'end_date_time' => $booking->expected_check_out_at?->format('Y-m-d H:i'),
+            'status' => $booking->status ,
+            'totalGuests' => $booking->guest_count,
+            'colorCode' => $booking->status === BookingStatusEnum::CheckedIn ? '#10b981' : '#3b82f6',
         ];
     }
 

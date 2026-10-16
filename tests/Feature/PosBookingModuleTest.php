@@ -96,7 +96,9 @@ class PosBookingModuleTest extends TestCase
             ->assertJsonMissing(['guest_name' => 'Other Date Guest']);
     }
 
-    public function test_it_returns_booking_dashboard_grouped_by_room_category(): void
+    #[TestWith(['reserved', 'confirmed', '#3b82f6'])]
+    #[TestWith(['checked_in', 'checked-in', '#10b981'])]
+    public function test_it_returns_booking_dashboard_grouped_by_room_category(string $status, string $expectedStatus, string $expectedColor): void
     {
         $category = RoomCategory::query()->create([
             'name' => 'Standard',
@@ -117,14 +119,22 @@ class PosBookingModuleTest extends TestCase
             'status' => RoomStatusEnum::Available->value,
         ]);
 
-        $this->withHeaders($this->posAuthHeaders())
+        $response = $this->withHeaders($this->posAuthHeaders())
             ->postJson('/api/v1/pos/bookings', [
                 'room_id' => $roomOne->id,
                 'booking_type' => BookingTypeEnum::Reservation->value,
                 'guest_name' => 'Dashboard Guest',
+                'guest_count' => 2,
                 'expected_check_in_at' => '2026-10-07 14:00:00',
                 'expected_check_out_at' => '2026-10-08 12:00:00',
             ])->assertCreated();
+
+        Booking::query()->findOrFail($response->json('data.id'))->update(['status' => $status]);
+
+        RoomCategory::query()->create([
+            'name' => 'Suite',
+            'is_active' => true,
+        ]);
 
         $this->withHeaders($this->posAuthHeaders())
             ->getJson('/api/v1/pos/booking-dashboard?start_date=2026-10-07&end_date=2026-10-08')
@@ -136,7 +146,19 @@ class PosBookingModuleTest extends TestCase
             ->assertJsonPath('data.room_categories.0.availability.0.total_count', 2)
             ->assertJsonPath('data.room_categories.0.availability.0.booked_count', 1)
             ->assertJsonPath('data.room_categories.0.availability.0.available_count', 1)
-            ->assertJsonPath('data.room_categories.0.rooms.0.bookings.0.guest_name', 'Dashboard Guest');
+            ->assertJsonCount(2, 'data.room_categories.0.rooms')
+            ->assertJsonMissingPath('data.room_categories.0.rooms.0.bookings')
+            ->assertJsonMissingPath('data.room_categories.0.rooms.1.bookings')
+            ->assertJsonPath('data.room_categories.0.bookings', [[
+                'roomId' => (string) $roomOne->id,
+                'guestName' => 'Dashboard Guest',
+                'start_date_time' => '2026-10-07 12:30',
+                'end_date_time' => '2026-10-08 11:30',
+                'status' => $expectedStatus,
+                'totalGuests' => 2,
+                'colorCode' => $expectedColor,
+            ]])
+            ->assertJsonPath('data.room_categories.1.bookings', []);
     }
 
     public function test_it_accepts_per_page_as_camel_case_for_pos_booking_lists(): void
