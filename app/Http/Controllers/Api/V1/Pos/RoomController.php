@@ -44,6 +44,8 @@ class RoomController extends Controller
             'Room retrieved successfully.',
             PosRoomResource::make($room->load([
                 'roomCategory',
+                'bookings.foodOrders',
+                'bookings.serviceOrders',
                 'bookings' => fn ($query) => $query
                     ->whereIn('status', [BookingStatusEnum::Reserved->value, BookingStatusEnum::CheckedIn->value])
                     ->latest(),

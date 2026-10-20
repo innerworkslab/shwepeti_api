@@ -340,6 +340,18 @@ class PosOrderModuleTest extends TestCase
             ->assertJsonPath('data.balance_amount', '170.00')
             ->assertJsonPath('data.food_orders.0.total_amount', '40.00')
             ->assertJsonPath('data.service_orders.0.total_amount', '30.00');
+
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/pos/rooms/{$room->id}")
+            ->assertOk()
+            ->assertJsonPath('data.current_booking.id', $bookingId)
+            ->assertJsonPath('data.current_booking.food_order_amount', '40.00')
+            ->assertJsonPath('data.current_booking.service_order_amount', '30.00')
+            ->assertJsonPath('data.current_booking.order_amount', '70.00')
+            ->assertJsonPath('data.current_booking.grand_total_amount', '170.00')
+            ->assertJsonPath('data.current_booking.balance_amount', '170.00')
+            ->assertJsonPath('data.bookings.0.food_order_amount', '40.00')
+            ->assertJsonPath('data.bookings.0.service_order_amount', '30.00');
     }
 
     public function test_it_blocks_orders_for_reserved_booking(): void

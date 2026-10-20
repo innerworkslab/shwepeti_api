@@ -24,8 +24,8 @@ class CashbookTransactionService
         $query = CashbookTransaction::query()
             ->with(['cashbook', 'creator'])
             ->filter($filters)
-            ->latest('transaction_date')
-            ->latest('id');
+            ->orderBy('id', 'asc');
+        // ->latest('id');
 
         if (! isset($filters['page'])) {
             return $query->get();
