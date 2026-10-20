@@ -266,6 +266,8 @@ class InventoryManagementModuleTest extends TestCase
 
     public function test_it_includes_inventory_stock_balance_movement_totals(): void
     {
+        $this->travelTo(now()->setDate(2026, 10, 2)->startOfDay());
+
         $headers = $this->authHeaders();
         [$item, $warehouse, $unit] = $this->inventorySetup();
 
@@ -293,9 +295,25 @@ class InventoryManagementModuleTest extends TestCase
         $this->withHeaders($headers)
             ->getJson("/api/v1/admin/inventory-stock-balances?item_id={$item->id}&warehouse_id={$warehouse->id}&page=1")
             ->assertOk()
-            ->assertJsonPath('data.0.opening_balance', '14.000000')
+            ->assertJsonPath('data.0.opening_balance', '15.000000')
             ->assertJsonPath('data.0.in_balance', '0.000000')
-            ->assertJsonPath('data.0.out_balance', '0.000000')
+            ->assertJsonPath('data.0.out_balance', '3.000000')
+            ->assertJsonPath('data.0.closing_balance', '12.000000');
+
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/admin/inventory-stock-balances?item_id={$item->id}&date_from=2026-10-01")
+            ->assertOk()
+            ->assertJsonPath('data.0.opening_balance', '10.000000')
+            ->assertJsonPath('data.0.in_balance', '5.000000')
+            ->assertJsonPath('data.0.out_balance', '3.000000')
+            ->assertJsonPath('data.0.closing_balance', '12.000000');
+
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/admin/inventory-stock-balances?item_id={$item->id}&date_to=2026-11-01")
+            ->assertOk()
+            ->assertJsonPath('data.0.opening_balance', '15.000000')
+            ->assertJsonPath('data.0.in_balance', '2.000000')
+            ->assertJsonPath('data.0.out_balance', '3.000000')
             ->assertJsonPath('data.0.closing_balance', '14.000000');
     }
 

@@ -12,6 +12,10 @@ class InventoryStockBalanceService
 {
     public function paginate(array $filters = []): LengthAwarePaginator|Collection
     {
+        $currentDate = now()->toDateString();
+        $filters['date_from'] ??= $currentDate;
+        $filters['date_to'] ??= $currentDate;
+
         $query = InventoryStockBalance::query()->with(['item.stockUnit', 'warehouse'])->filter($filters)->latest();
 
         if (! isset($filters['page'])) {
