@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Pos\AuthController;
 use App\Http\Controllers\Api\V1\Pos\BookingController;
 use App\Http\Controllers\Api\V1\Pos\BookingDashboardController;
 use App\Http\Controllers\Api\V1\Pos\CashbookController;
+use App\Http\Controllers\Api\V1\Pos\CashbookTransactionController;
 use App\Http\Controllers\Api\V1\Pos\FoodOrderController;
 use App\Http\Controllers\Api\V1\Pos\ItemController;
 use App\Http\Controllers\Api\V1\Pos\MenuController;
@@ -23,6 +24,7 @@ Route::prefix('v1/pos')->name('pos.')->group(function (): void {
         Route::apiResource('menus', MenuController::class)->only(['index']);
         Route::apiResource('items', ItemController::class)->only(['index']);
         Route::apiResource('cashbooks', CashbookController::class)->only(['index']);
+        Route::apiResource('cashbook-transactions', CashbookTransactionController::class)->only(['index']);
 
         Route::get('booking-dashboard', [BookingDashboardController::class, 'index']);
         Route::apiResource('bookings', BookingController::class)->only(['index', 'store', 'show']);

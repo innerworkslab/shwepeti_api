@@ -3,6 +3,7 @@
 namespace App\Services\CashbookTransactions;
 
 use App\Enums\CashbookTransactionTypeEnum;
+use App\Enums\CashbookTypeEnum;
 use App\Http\Resources\CashbookTransactions\CashbookTransactionResource;
 use App\Models\Cashbook;
 use App\Models\CashbookTransaction;
@@ -26,6 +27,24 @@ class CashbookTransactionService
             ->filter($filters)
             ->orderBy('id', 'asc');
         // ->latest('id');
+
+        if (! isset($filters['page'])) {
+            return $query->get();
+        }
+
+        return $query->paginate((int) ($filters['per_page'] ?? 15));
+    }
+
+    public function paginateForPos(array $filters = []): LengthAwarePaginator|Collection
+    {
+        $query = CashbookTransaction::query()
+            ->with(['cashbook', 'creator'])
+            ->whereHas('cashbook', fn (Builder $query) => $query->whereIn('type', [
+                CashbookTypeEnum::PosCash->value,
+                CashbookTypeEnum::PosBank->value,
+            ]))
+            ->filter($filters)
+            ->orderBy('id', 'asc');
 
         if (! isset($filters['page'])) {
             return $query->get();
