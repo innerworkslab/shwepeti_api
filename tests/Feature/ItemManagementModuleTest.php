@@ -200,6 +200,62 @@ class ItemManagementModuleTest extends TestCase
             ->assertJsonPath('data.0.id', $inactiveItemId);
     }
 
+    public function test_item_list_returns_unique_available_units(): void
+    {
+        $headers = $this->authHeaders();
+        $setup = $this->inventorySetup($headers);
+        $itemId = $this->createItem($headers, $setup);
+
+        foreach ([
+            [$setup['kg_id'], $setup['g_id'], 1000],
+            [$setup['g_id'], $setup['kg_id'], 0.001],
+            [$setup['box_id'], $setup['kg_id'], 12],
+        ] as [$fromUnitId, $toUnitId, $factor]) {
+            $this->withHeaders($headers)->postJson('/api/v1/admin/item-unit-conversions', [
+                'item_id' => $itemId,
+                'from_unit_id' => $fromUnitId,
+                'to_unit_id' => $toUnitId,
+                'conversion_factor' => $factor,
+                'is_active' => true,
+            ])->assertCreated();
+        }
+
+        $this->withHeaders($headers)->getJson('/api/v1/admin/items')
+            ->assertOk()
+            ->assertJsonPath('data.0.units.*.id', [$setup['kg_id'], $setup['g_id'], $setup['box_id']])
+            ->assertJsonPath('data.0.units.0.name', 'kg')
+            ->assertJsonPath('data.0.units.1.symbol', 'g');
+    }
+
+    public function test_item_list_excludes_inactive_and_unrelated_conversion_units(): void
+    {
+        $headers = $this->authHeaders();
+        $setup = $this->inventorySetup($headers);
+        $itemId = $this->createItem($headers, $setup);
+
+        foreach ([
+            [$setup['kg_id'], $setup['g_id'], false],
+            [$setup['g_id'], $setup['box_id'], true],
+            [$setup['box_id'], $setup['kg_id'], true],
+        ] as [$fromUnitId, $toUnitId, $isActive]) {
+            $this->withHeaders($headers)->postJson('/api/v1/admin/item-unit-conversions', [
+                'item_id' => $itemId,
+                'from_unit_id' => $fromUnitId,
+                'to_unit_id' => $toUnitId,
+                'conversion_factor' => 10,
+                'is_active' => $isActive,
+            ])->assertCreated();
+        }
+
+        $this->withHeaders($headers)->postJson("/api/v1/admin/units/{$setup['box_id']}/toggle-active", [
+            'is_active' => false,
+        ])->assertOk();
+
+        $this->withHeaders($headers)->getJson('/api/v1/admin/items?page=1')
+            ->assertOk()
+            ->assertJsonPath('data.0.units.*.id', [$setup['kg_id']]);
+    }
+
     /**
      * @param  array<string, string>  $headers
      * @return array<string, int>

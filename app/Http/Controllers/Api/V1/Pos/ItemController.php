@@ -28,7 +28,7 @@ class ItemController extends Controller
         unset($filters['category']);
 
         $query = Item::query()
-            ->with(['itemCategory', 'stockUnit'])
+            ->with(['itemCategory', 'stockUnit', 'unitConversions.fromUnit', 'unitConversions.toUnit'])
             ->filter($filters)
             ->latest();
 

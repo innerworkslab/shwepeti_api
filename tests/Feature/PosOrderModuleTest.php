@@ -293,7 +293,8 @@ class PosOrderModuleTest extends TestCase
         $this->withHeaders($headers)
             ->getJson('/api/v1/pos/items?category=laundry')
             ->assertOk()
-            ->assertJsonPath('data.0.id', $item->id);
+            ->assertJsonPath('data.0.id', $item->id)
+            ->assertJsonPath('data.0.units.*.id', [$item->stock_unit_id]);
     }
 
     public function test_booking_show_includes_food_and_service_orders_with_effective_amounts(): void
