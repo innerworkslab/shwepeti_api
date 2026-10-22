@@ -37,6 +37,11 @@ class Cashbook extends Model implements AuditableContract
         return $this->hasMany(CashbookTransaction::class);
     }
 
+    public function closings(): HasMany
+    {
+        return $this->hasMany(CashbookClosing::class);
+    }
+
     public function scopeFilter(Builder $query, array $filters): Builder
     {
         return $query

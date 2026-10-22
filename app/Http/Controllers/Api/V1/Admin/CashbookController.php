@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Cashbooks\CloseCashbookRequest;
+use App\Http\Requests\Cashbooks\ListCashbookClosingRequest;
 use App\Http\Requests\Cashbooks\SaveCashbookRequest;
 use App\Http\Requests\Cashbooks\ToggleCashbookActiveRequest;
+use App\Http\Resources\Cashbooks\CashbookClosingResource;
 use App\Http\Resources\Cashbooks\CashbookResource;
 use App\Models\Cashbook;
 use App\Services\Cashbooks\CashbookService;
@@ -47,5 +50,21 @@ class CashbookController extends Controller
         $cashbook = $this->cashbookService->toggleActive($cashbook, (bool) $request->validated('is_active'));
 
         return ApiResponse::resource('Cashbook active status updated successfully.', $cashbook);
+    }
+
+    public function close(CloseCashbookRequest $request): JsonResponse
+    {
+        $cashbook = Cashbook::query()->findOrFail($request->validated('cashbook_id'));
+
+        return ApiResponse::resource('Cashbook closed successfully.', CashbookClosingResource::make(
+            $this->cashbookService->close($cashbook, $request->validated(), $request->user()),
+        ), status: 201);
+    }
+
+    public function closings(ListCashbookClosingRequest $request, Cashbook $cashbook): JsonResponse
+    {
+        return ApiResponse::resource('Cashbook closings retrieved successfully.', CashbookClosingResource::collection(
+            $this->cashbookService->closings($cashbook, $request->validated()),
+        ));
     }
 }

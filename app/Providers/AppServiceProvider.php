@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\BookingPayment;
 use App\Models\Cashbook;
 use App\Models\CashbookTransaction;
+use App\Models\CashbookTransfer;
 use App\Models\FixedAsset;
 use App\Models\FoodOrder;
 use App\Models\FoodOrderItem;
@@ -66,6 +67,7 @@ class AppServiceProvider extends ServiceProvider
             'service_order' => ServiceOrder::class,
             'service_order_item' => ServiceOrderItem::class,
             'cashbook' => Cashbook::class,
+            'cashbook_transfer' => CashbookTransfer::class,
             'cashbook_transaction' => CashbookTransaction::class,
             'supplier' => Supplier::class,
             'supplier_ap_payment' => SupplierApPayment::class,
