@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Admin\CashbookController;
 use App\Http\Controllers\Api\V1\Admin\CashbookTransactionController;
 use App\Http\Controllers\Api\V1\Admin\CashbookTransferController;
 use App\Http\Controllers\Api\V1\Admin\FixedAssetController;
+use App\Http\Controllers\Api\V1\Admin\HotelReportController;
 use App\Http\Controllers\Api\V1\Admin\InventoryAdjustmentController;
 use App\Http\Controllers\Api\V1\Admin\InventoryLedgerController;
 use App\Http\Controllers\Api\V1\Admin\InventoryStockBalanceController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Api\V1\Admin\ItemController;
 use App\Http\Controllers\Api\V1\Admin\ItemUnitConversionController;
 use App\Http\Controllers\Api\V1\Admin\MenuCategoryController;
 use App\Http\Controllers\Api\V1\Admin\MenuController;
+use App\Http\Controllers\Api\V1\Admin\ProfitAndLossReportController;
 use App\Http\Controllers\Api\V1\Admin\RoomCategoryController;
 use App\Http\Controllers\Api\V1\Admin\RoomController;
 use App\Http\Controllers\Api\V1\Admin\StockInController;
@@ -39,6 +41,10 @@ Route::prefix('v1/admin')->group(function (): void {
         Route::get('me', [AuthController::class, 'me']);
 
         Route::middleware('role:'.UserRoleEnum::HotelAdministrator->value)->group(function (): void {
+            Route::get('reports/profit-and-loss', [ProfitAndLossReportController::class, 'index'])->name('admin.reports.profit-and-loss');
+            Route::get('reports/{report}', [HotelReportController::class, 'index'])
+                ->whereIn('report', ['daily-summary', 'room-occupancy', 'room-revenue', 'guest-balances', 'food-sales', 'top-selling-items', 'other-bills', 'inventory-balance', 'low-stock', 'depreciation'])
+                ->name('admin.reports.hotel');
             Route::apiResource('users', UserController::class)->except(['update', 'delete']);
             Route::post('users/{user}/restore', [UserController::class, 'restore']);
             Route::apiResource('room-categories', RoomCategoryController::class)->except(['update', 'delete']);
