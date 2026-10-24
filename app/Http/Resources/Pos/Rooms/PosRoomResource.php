@@ -31,8 +31,8 @@ class PosRoomResource extends JsonResource
                     'bookings',
                     fn() => $this->bookings
                         ->whereIn('status', [
-                            BookingStatusEnum::Reserved->value,
-                            BookingStatusEnum::CheckedIn->value,
+                            BookingStatusEnum::Reserved,
+                            BookingStatusEnum::CheckedIn,
                         ])
                         ->first()
                 )
