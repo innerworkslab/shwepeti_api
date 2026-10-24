@@ -377,7 +377,7 @@ class PosBookingModuleTest extends TestCase
             ->assertJsonPath('data.total_amount', '25000.00');
     }
 
-    public function test_it_blocks_overlapping_walk_in_session_and_allows_back_to_back_session(): void
+    public function test_it_blocks_overlapping_walk_in_session_and_blocks_back_to_back_session_until_checkout(): void
     {
         $room = $this->createAvailableRoom();
         $headers = $this->posAuthHeaders();
@@ -420,7 +420,12 @@ class PosBookingModuleTest extends TestCase
                 'session_hours' => 2,
                 'session_rate' => 20000,
             ])
-            ->assertCreated();
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'room_id' => 'This room already has a checked-in booking. Please check out the current booking before checking in.',
+            ]);
+
+        $this->assertDatabaseCount('bookings', 1);
     }
 
     public function test_it_requires_session_fields_for_session_booking(): void
@@ -464,10 +469,112 @@ class PosBookingModuleTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
+    public function test_it_blocks_check_in_until_the_previous_room_booking_is_checked_out(): void
+    {
+        $room = $this->createAvailableRoom();
+        $headers = $this->posAuthHeaders();
+
+        $currentBookingId = $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::WalkIn->value,
+                'guest_name' => 'Current Guest',
+                'expected_check_in_at' => '2026-10-14 12:30:00',
+                'expected_check_out_at' => '2026-10-15 11:30:00',
+            ])->assertCreated()->json('data.id');
+
+        $nextBookingId = $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::Reservation->value,
+                'guest_name' => 'Next Guest',
+                'expected_check_in_at' => '2026-10-15 12:30:00',
+                'expected_check_out_at' => '2026-10-16 11:30:00',
+            ])->assertCreated()->json('data.id');
+
+        $this->withHeaders($headers)
+            ->postJson("/api/v1/pos/bookings/{$nextBookingId}/check-in")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'room_id' => 'This room already has a checked-in booking. Please check out the current booking before checking in.',
+            ]);
+
+        $this->assertDatabaseHas('bookings', [
+            'id' => $nextBookingId,
+            'status' => BookingStatusEnum::Reserved->value,
+            'checked_in_at' => null,
+            'checked_in_by' => null,
+        ]);
+        $this->assertDatabaseHas('rooms', [
+            'id' => $room->id,
+            'status' => RoomStatusEnum::Reserved->value,
+        ]);
+
+        $this->withHeaders($headers)
+            ->postJson("/api/v1/pos/bookings/{$currentBookingId}/check-out")
+            ->assertOk();
+
+        $this->withHeaders($headers)
+            ->postJson("/api/v1/pos/bookings/{$nextBookingId}/check-in")
+            ->assertOk()
+            ->assertJsonPath('data.status', BookingStatusEnum::CheckedIn->value);
+
+        $this->assertDatabaseHas('bookings', [
+            'id' => $nextBookingId,
+            'status' => BookingStatusEnum::CheckedIn->value,
+        ]);
+    }
+
+    #[TestWith(['walk_in', false])]
+    #[TestWith(['reservation', true])]
+    public function test_it_blocks_immediate_check_in_for_an_occupied_room(string $bookingType, bool $checkInNow): void
+    {
+        $room = $this->createAvailableRoom();
+        $headers = $this->posAuthHeaders();
+
+        $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => BookingTypeEnum::WalkIn->value,
+                'guest_name' => 'Current Guest',
+                'expected_check_in_at' => '2026-10-14 12:30:00',
+                'expected_check_out_at' => '2026-10-15 11:30:00',
+            ])->assertCreated();
+
+        $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $room->id,
+                'booking_type' => $bookingType,
+                'check_in_now' => $checkInNow,
+                'guest_name' => 'Next Guest',
+                'expected_check_in_at' => '2026-10-15 12:30:00',
+                'expected_check_out_at' => '2026-10-16 11:30:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'room_id' => 'This room already has a checked-in booking. Please check out the current booking before checking in.',
+            ]);
+
+        $this->assertDatabaseCount('bookings', 1);
+        $this->assertDatabaseHas('rooms', [
+            'id' => $room->id,
+            'status' => RoomStatusEnum::Occupied->value,
+        ]);
+    }
+
     public function test_it_checks_in_and_checks_out_a_booking(): void
     {
         $room = $this->createAvailableRoom();
         $headers = $this->posAuthHeaders();
+
+        $this->withHeaders($headers)
+            ->postJson('/api/v1/pos/bookings', [
+                'room_id' => $this->createAvailableRoom()->id,
+                'booking_type' => BookingTypeEnum::WalkIn->value,
+                'guest_name' => 'Other Room Guest',
+                'expected_check_in_at' => now()->toDateTimeString(),
+                'expected_check_out_at' => now()->addDay()->toDateTimeString(),
+            ])->assertCreated();
 
         $bookingId = $this->withHeaders($headers)
             ->postJson('/api/v1/pos/bookings', [

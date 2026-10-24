@@ -14,9 +14,12 @@ class ProfitAndLossReportController extends Controller
 
     public function index(ProfitAndLossReportRequest $request): JsonResponse
     {
+        $report = $this->profitAndLossReportService->get($request->validated());
+
         return ApiResponse::success(
             'Profit and loss report retrieved successfully.',
-            $this->profitAndLossReportService->get($request->validated()),
+            $report['rows'],
+            $report['meta'],
         );
     }
 }

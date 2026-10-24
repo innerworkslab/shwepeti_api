@@ -49,7 +49,6 @@ class FixedAssetDepreciationService
     {
         return DB::transaction(function () use ($fixedAsset, $asOf): int {
             $fixedAsset = FixedAsset::query()->whereKey($fixedAsset->id)->lockForUpdate()->firstOrFail();
-
             if ($fixedAsset->status !== FixedAssetStatusEnum::Posted || ! $fixedAsset->depreciation_enabled) {
                 return 0;
             }
@@ -65,7 +64,6 @@ class FixedAssetDepreciationService
             $accumulated = BigDecimal::of($fixedAsset->accumulated_depreciation);
             $monthly = $purchase->minus($residual)->dividedBy($fixedAsset->useful_life_months, 2, RoundingMode::HalfUp);
             $count = 0;
-
             while ($period->lt($cutoff) && $period->lt($end)) {
                 $opening = $purchase->minus($accumulated);
                 $remaining = $opening->minus($residual);

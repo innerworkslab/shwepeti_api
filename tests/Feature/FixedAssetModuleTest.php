@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRoleEnum;
+use App\Models\AssetCategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class FixedAssetModuleTest extends TestCase
@@ -39,7 +41,7 @@ class FixedAssetModuleTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('data.is_active', false);
 
-        $this->withHeaders($headers)->getJson('/api/v1/admin/asset-categories')
+        $this->withHeaders($headers)->getJson('/api/v1/admin/asset-categories?parent_id')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $parentId);
@@ -47,6 +49,35 @@ class FixedAssetModuleTest extends TestCase
         $this->withHeaders($headers)->deleteJson("/api/v1/admin/asset-categories/{$parentId}")
             ->assertUnprocessable()
             ->assertJsonValidationErrors('asset_category');
+    }
+
+    #[TestWith(['?parent_id'])]
+    #[TestWith(['?parent_id='])]
+    #[TestWith(['?parent_id=&page=1'])]
+    public function test_empty_parent_filter_returns_only_root_categories(string $query): void
+    {
+        $parent = AssetCategory::query()->create(['name' => 'Equipment', 'slug' => 'equipment', 'code' => 'EQUIPMENT']);
+        AssetCategory::query()->create(['parent_id' => $parent->id, 'name' => 'Kitchen', 'slug' => 'kitchen', 'code' => 'KITCHEN']);
+
+        $this->withHeaders($this->authHeaders())->getJson('/api/v1/admin/asset-categories'.$query)
+            ->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $parent->id)
+            ->assertJsonPath('data.0.parent_id', null);
+    }
+
+    public function test_parent_id_filters_children_and_omitted_parent_keeps_active_child_list(): void
+    {
+        $parent = AssetCategory::query()->create(['name' => 'Equipment', 'slug' => 'equipment', 'code' => 'EQUIPMENT']);
+        $child = AssetCategory::query()->create(['parent_id' => $parent->id, 'name' => 'Kitchen', 'slug' => 'kitchen', 'code' => 'KITCHEN']);
+        AssetCategory::query()->create(['parent_id' => $parent->id, 'name' => 'Inactive', 'slug' => 'inactive', 'code' => 'INACTIVE', 'is_active' => false]);
+        $other = AssetCategory::query()->create(['name' => 'Furniture', 'slug' => 'furniture', 'code' => 'FURNITURE']);
+        AssetCategory::query()->create(['parent_id' => $other->id, 'name' => 'Bed', 'slug' => 'bed', 'code' => 'BED']);
+        $headers = $this->authHeaders();
+
+        $this->withHeaders($headers)->getJson('/api/v1/admin/asset-categories?parent_id='.$parent->id)
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $child->id);
+        $this->withHeaders($headers)->getJson('/api/v1/admin/asset-categories')
+            ->assertOk()->assertJsonCount(2, 'data');
     }
 
     public function test_posting_a_fixed_asset_creates_exactly_one_cashbook_expense(): void

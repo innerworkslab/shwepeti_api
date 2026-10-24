@@ -20,6 +20,10 @@ class AssetCategoryService
             ->latest();
 
         if (! isset($filters['page'])) {
+            if (! array_key_exists('parent_id', $filters)) {
+                $query->whereNotNull('parent_id');
+            }
+
             return $query->where('is_active', true)->get();
         }
 

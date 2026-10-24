@@ -20,7 +20,12 @@ class ItemCategoryService
             ->latest();
 
         if (! isset($filters['page'])) {
+            if (! array_key_exists('parent_id', $filters)) {
+                $query->whereNotNull('parent_id');
+            }
+
             return $query->where('is_active', true)->get();
+            // return $query->whereNotNull('parent_id')->where('is_active', true)->get();
         }
 
         return $query->paginate((int) ($filters['per_page'] ?? 15));

@@ -38,6 +38,7 @@ class BookingDashboardService
             ->where('expected_check_in_at', '<=', $endDate)
             ->where('expected_check_out_at', '>=', $startDate)
             ->whereIn('status', [
+                BookingStatusEnum::CheckedOut->value,
                 BookingStatusEnum::Reserved->value,
                 BookingStatusEnum::CheckedIn->value,
             ])

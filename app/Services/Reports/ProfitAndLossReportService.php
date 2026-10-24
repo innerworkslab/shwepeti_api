@@ -70,38 +70,30 @@ class ProfitAndLossReportService
         $netProfit = $grossProfit - $totalExpenses;
 
         return [
-            'date_from' => $filters['date_from'],
-            'date_to' => $filters['date_to'],
-            'basis' => 'completed_bookings_and_recorded_expenses',
-            'revenue' => [
-                'rooms' => $this->decimal($roomRevenue),
-                'food' => $this->decimal($foodRevenue),
-                'services' => $this->decimal($serviceRevenue),
-                'other_income' => $this->decimal($otherIncome),
-                'total' => $this->decimal($totalRevenue),
+            'rows' => [
+                ['name' => 'Room Income', 'amount' => $this->decimal($roomRevenue)],
+                ['name' => 'Food / Order Income', 'amount' => $this->decimal($foodRevenue)],
+                ['name' => 'Other Income', 'amount' => $this->decimal($serviceRevenue + $otherIncome)],
+                ['name' => 'Total Income', 'amount' => $this->decimal($totalRevenue)],
+                ['name' => 'Operating Expense', 'amount' => $this->decimal($operatingExpenses + $recordedCosts)],
+                ['name' => 'Other Expense', 'amount' => $this->decimal(0)],
+                ['name' => 'Depreciation', 'amount' => $this->decimal($depreciation)],
+                ['name' => 'Total Expense', 'amount' => $this->decimal($totalExpenses + $recordedCosts)],
+                ['name' => 'Profit / Loss', 'amount' => $this->decimal($netProfit)],
             ],
-            'cost_of_sales' => [
-                'recorded_food_cost' => $this->decimal($recordedFoodCosts),
-                'recorded_stock_out_cost' => $this->decimal($recordedStockCosts),
-                'recorded_total' => $this->decimal($recordedCosts),
+            'meta' => [
+                'current_page' => 1,
+                'per_page' => 15,
+                'total' => 9,
+                'last_page' => 1,
+                'date_from' => $filters['date_from'],
+                'date_to' => $filters['date_to'],
+                'currency' => 'MMK',
+                'basis' => 'completed_bookings_and_recorded_expenses',
+                'has_missing_costs' => $missingCostCount > 0,
                 'missing_cost_count' => $missingCostCount,
-                'total' => $missingCostCount === 0 ? $this->decimal($recordedCosts) : null,
-            ],
-            'expenses' => [
-                'manual_cashbook_expenses' => $this->decimal($operatingExpenses),
-                'depreciation' => $this->decimal($depreciation),
-                'total' => $this->decimal($totalExpenses),
-            ],
-            'gross_profit' => $missingCostCount === 0 ? $this->decimal($grossProfit) : null,
-            'net_profit' => $missingCostCount === 0 ? $this->decimal($netProfit) : null,
-            'profit_before_unrecorded_costs' => $this->decimal($netProfit),
-            'has_missing_costs' => $missingCostCount > 0,
-            'notes' => [
-                'Room charges and non-cancelled food and service orders are recognized on booking checkout, including archived bookings. Discounts are deducted, service charges included, and sales taxes excluded.',
-                'Unlinked cashbook entries are treated as other income or operating expenses on their transaction date. Booking payments, transfers, asset purchases and supplier settlements are excluded.',
-                'Food usage costs follow the related booking checkout. Stock-out costs follow their transaction date. Inventory purchases, transfers and adjustments are excluded.',
-                'Depreciation uses recorded entries dated within the period; monthly entries are not prorated. Unrecorded depreciation and unpaid operating expenses are not estimated.',
-                'Missing inventory costs leave gross and net profit unavailable. Profit before unrecorded costs uses only recorded costs.',
+                'recorded_total_expense' => $this->decimal($totalExpenses + $recordedCosts),
+                'profit_before_unrecorded_costs' => $this->decimal($netProfit),
             ],
         ];
     }

@@ -60,6 +60,10 @@ class BookingService
             }
 
             $this->ensureExpectedCheckoutAfterCheckin($expectedCheckInAt, $expectedCheckOutAt);
+            if ($checkInNow) {
+                $this->ensureRoomHasNoCheckedInBooking($room);
+            }
+
             $this->ensureRoomCanAcceptBooking($room);
             $this->ensureRoomHasNoBookingOverlap($room, $expectedCheckInAt, $expectedCheckOutAt);
 
@@ -141,13 +145,16 @@ class BookingService
     public function checkIn(Booking $booking, ?User $actor = null): PosBookingResource
     {
         return DB::transaction(function () use ($booking, $actor): PosBookingResource {
-            $booking->load('room');
+            $room = Room::query()->lockForUpdate()->findOrFail($booking->room_id);
+            $booking = Booking::query()->lockForUpdate()->findOrFail($booking->id);
 
             if ($booking->status !== BookingStatusEnum::Reserved) {
                 throw ValidationException::withMessages([
                     'booking' => ['Only reserved bookings can be checked in.'],
                 ]);
             }
+
+            $this->ensureRoomHasNoCheckedInBooking($room);
 
             $booking->update([
                 'status' => BookingStatusEnum::CheckedIn,
@@ -156,7 +163,7 @@ class BookingService
                 'updated_by' => $actor?->id,
             ]);
 
-            $booking->room->update([
+            $room->update([
                 'status' => RoomStatusEnum::Occupied,
                 'updated_by' => $actor?->id,
             ]);
@@ -420,6 +427,21 @@ class BookingService
             ->where('room_id', $room->id)
             ->whereIn('status', [BookingStatusEnum::Reserved->value, BookingStatusEnum::CheckedIn->value])
             ->exists();
+    }
+
+    private function ensureRoomHasNoCheckedInBooking(Room $room): void
+    {
+        $hasCheckedInBooking = Booking::query()
+            ->where('room_id', $room->id)
+            ->where('status', BookingStatusEnum::CheckedIn->value)
+            ->lockForUpdate()
+            ->exists();
+
+        if ($hasCheckedInBooking) {
+            throw ValidationException::withMessages([
+                'room_id' => ['This room already has a checked-in booking. Please check out the current booking before checking in.'],
+            ]);
+        }
     }
 
     private function ensureRoomHasNoBookingOverlap(Room $room, Carbon $expectedCheckInAt, Carbon $expectedCheckOutAt): void

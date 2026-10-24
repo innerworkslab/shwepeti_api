@@ -63,12 +63,20 @@ class ProfitAndLossReportTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
-            ->assertJsonPath('data.revenue', ['rooms' => '95.00', 'food' => '47.00', 'services' => '20.00', 'other_income' => '10.00', 'total' => '172.00'])
-            ->assertJsonPath('data.cost_of_sales.total', '20.00')
-            ->assertJsonPath('data.expenses.total', '25.00')
-            ->assertJsonPath('data.gross_profit', '152.00')
-            ->assertJsonPath('data.net_profit', '127.00')
-            ->assertJsonPath('data.has_missing_costs', false);
+            ->assertJsonPath('data', [
+                ['name' => 'Room Income', 'amount' => '95.00'],
+                ['name' => 'Food / Order Income', 'amount' => '47.00'],
+                ['name' => 'Other Income', 'amount' => '30.00'],
+                ['name' => 'Total Income', 'amount' => '172.00'],
+                ['name' => 'Operating Expense', 'amount' => '40.00'],
+                ['name' => 'Other Expense', 'amount' => '0.00'],
+                ['name' => 'Depreciation', 'amount' => '5.00'],
+                ['name' => 'Total Expense', 'amount' => '45.00'],
+                ['name' => 'Profit / Loss', 'amount' => '127.00'],
+            ])
+            ->assertJsonPath('meta.has_missing_costs', false)
+            ->assertJsonPath('meta.total', 9)
+            ->assertJsonMissingPath('meta.notes');
     }
 
     public function test_uses_inclusive_checkout_dates_and_preserves_archived_revenue(): void
@@ -85,13 +93,13 @@ class ProfitAndLossReportTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
-            ->assertJsonPath('data.revenue.rooms', '190.00')
-            ->assertJsonPath('data.net_profit', '200.00');
+            ->assertJsonPath('data.0.amount', '190.00')
+            ->assertJsonPath('data.8.amount', '200.00');
     }
 
     #[TestWith(['out'])]
     #[TestWith(['food_order'])]
-    public function test_missing_inventory_costs_do_not_present_final_profit(string $type): void
+    public function test_missing_inventory_costs_return_profit_from_recorded_expenses(string $type): void
     {
         $booking = $this->booking();
         $food = FoodOrder::query()->create(['booking_id' => $booking->id, 'order_no' => 'FO-1', 'status' => 'served', 'total_amount' => 5]);
@@ -100,12 +108,12 @@ class ProfitAndLossReportTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
-            ->assertJsonPath('data.has_missing_costs', true)
-            ->assertJsonPath('data.cost_of_sales.missing_cost_count', 1)
-            ->assertJsonPath('data.cost_of_sales.total', null)
-            ->assertJsonPath('data.gross_profit', null)
-            ->assertJsonPath('data.net_profit', null)
-            ->assertJsonPath('data.profit_before_unrecorded_costs', '100.00');
+            ->assertJsonPath('meta.has_missing_costs', true)
+            ->assertJsonPath('meta.missing_cost_count', 1)
+            ->assertJsonPath('data.4.amount', '0.00')
+            ->assertJsonPath('data.7.amount', '0.00')
+            ->assertJsonPath('data.8.amount', '100.00')
+            ->assertJsonPath('meta.profit_before_unrecorded_costs', '100.00');
     }
 
     public function test_empty_period_returns_zero_totals(): void
@@ -113,10 +121,10 @@ class ProfitAndLossReportTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
-            ->assertJsonPath('data.revenue.total', '0.00')
-            ->assertJsonPath('data.expenses.total', '0.00')
-            ->assertJsonPath('data.net_profit', '0.00')
-            ->assertJsonPath('data.has_missing_costs', false);
+            ->assertJsonPath('data.3.amount', '0.00')
+            ->assertJsonPath('data.7.amount', '0.00')
+            ->assertJsonPath('data.8.amount', '0.00')
+            ->assertJsonPath('meta.has_missing_costs', false);
     }
 
     public function test_losses_are_returned_as_negative_amounts(): void
@@ -124,7 +132,7 @@ class ProfitAndLossReportTest extends TestCase
         $this->cashEntry('expense', 20.25);
         $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
-        $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()->assertJsonPath('data.net_profit', '-20.25');
+        $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()->assertJsonPath('data.8.amount', '-20.25');
     }
 
     #[TestWith(['', ['date_from', 'date_to']])]

@@ -48,7 +48,7 @@ class RoomController extends Controller
                 'bookings.serviceOrders',
                 'bookings' => fn ($query) => $query
                     ->whereIn('status', [BookingStatusEnum::Reserved->value, BookingStatusEnum::CheckedIn->value])
-                    ->latest(),
+                    ->orderBy('expected_check_in_at', 'asc'),
             ])),
         );
     }
