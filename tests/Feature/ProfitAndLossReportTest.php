@@ -69,14 +69,50 @@ class ProfitAndLossReportTest extends TestCase
                 ['name' => 'Other Income', 'amount' => '30.00'],
                 ['name' => 'Total Income', 'amount' => '172.00'],
                 ['name' => 'Operating Expense', 'amount' => '40.00'],
+                ['name' => 'Purchasing', 'amount' => '0.00'],
                 ['name' => 'Other Expense', 'amount' => '0.00'],
                 ['name' => 'Depreciation', 'amount' => '5.00'],
                 ['name' => 'Total Expense', 'amount' => '45.00'],
                 ['name' => 'Profit / Loss', 'amount' => '127.00'],
             ])
             ->assertJsonPath('meta.has_missing_costs', false)
-            ->assertJsonPath('meta.total', 9)
+            ->assertJsonPath('meta.total', 10)
             ->assertJsonMissingPath('meta.notes');
+    }
+
+    public function test_purchasing_includes_posted_stock_in_totals_within_the_period_once(): void
+    {
+        $warehouse = Warehouse::query()->create(['code' => 'MAIN', 'name' => 'Main Warehouse']);
+        foreach ([
+            ['posted', '2026-10-01 00:00:00', 100.25, 25],
+            ['posted', '2026-10-31 23:59:59', 50.50, 0],
+            ['posted', '2026-10-15 12:00:00', 20, 20],
+            ['draft', '2026-10-15 12:00:00', 300, 0],
+            ['cancelled', '2026-10-15 12:00:00', 400, 0],
+            ['posted', '2026-09-30 23:59:59', 500, 0],
+            ['posted', '2026-11-01 00:00:00', 600, 0],
+        ] as [$status, $date, $total, $paid]) {
+            StockIn::query()->create([
+                'reference_no' => fake()->unique()->bothify('SIN-########'),
+                'warehouse_id' => $warehouse->id,
+                'status' => $status,
+                'transaction_date' => $date,
+                'total_amount' => $total,
+                'paid_amount' => $paid,
+            ]);
+        }
+        $this->cashEntry('expense', 45, (new StockIn)->getMorphClass());
+        $this->cashEntry('expense', 50, (new SupplierApPayment)->getMorphClass());
+        $this->cashEntry('expense', 10);
+        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+
+        $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
+            ->assertJsonPath('data.4.amount', '10.00')
+            ->assertJsonPath('data.5', ['name' => 'Purchasing', 'amount' => '170.75'])
+            ->assertJsonPath('data.8.amount', '180.75')
+            ->assertJsonPath('data.9.amount', '-180.75')
+            ->assertJsonPath('meta.recorded_total_expense', '180.75')
+            ->assertJsonPath('meta.profit_before_unrecorded_costs', '-180.75');
     }
 
     public function test_uses_inclusive_checkout_dates_and_preserves_archived_revenue(): void
@@ -94,7 +130,7 @@ class ProfitAndLossReportTest extends TestCase
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
             ->assertJsonPath('data.0.amount', '190.00')
-            ->assertJsonPath('data.8.amount', '200.00');
+            ->assertJsonPath('data.9.amount', '200.00');
     }
 
     #[TestWith(['out'])]
@@ -111,8 +147,8 @@ class ProfitAndLossReportTest extends TestCase
             ->assertJsonPath('meta.has_missing_costs', true)
             ->assertJsonPath('meta.missing_cost_count', 1)
             ->assertJsonPath('data.4.amount', '0.00')
-            ->assertJsonPath('data.7.amount', '0.00')
-            ->assertJsonPath('data.8.amount', '100.00')
+            ->assertJsonPath('data.8.amount', '0.00')
+            ->assertJsonPath('data.9.amount', '100.00')
             ->assertJsonPath('meta.profit_before_unrecorded_costs', '100.00');
     }
 
@@ -122,8 +158,8 @@ class ProfitAndLossReportTest extends TestCase
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
             ->assertJsonPath('data.3.amount', '0.00')
-            ->assertJsonPath('data.7.amount', '0.00')
             ->assertJsonPath('data.8.amount', '0.00')
+            ->assertJsonPath('data.9.amount', '0.00')
             ->assertJsonPath('meta.has_missing_costs', false);
     }
 
@@ -132,7 +168,7 @@ class ProfitAndLossReportTest extends TestCase
         $this->cashEntry('expense', 20.25);
         $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
-        $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()->assertJsonPath('data.8.amount', '-20.25');
+        $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()->assertJsonPath('data.9.amount', '-20.25');
     }
 
     #[TestWith(['', ['date_from', 'date_to']])]

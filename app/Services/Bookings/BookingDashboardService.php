@@ -122,6 +122,7 @@ class BookingDashboardService
     private function bookingPayload(Booking $booking): array
     {
         return [
+            'bookingId'=>$booking->id,
             'roomId' => (string) $booking->room_id,
             'guestName' => $booking->guest_name,
             'start_date_time' => $booking->expected_check_in_at?->format('Y-m-d H:i'),

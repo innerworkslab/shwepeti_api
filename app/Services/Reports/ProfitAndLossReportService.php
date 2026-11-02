@@ -6,6 +6,7 @@ use App\Enums\BookingStatusEnum;
 use App\Enums\CashbookTransactionTypeEnum;
 use App\Enums\FoodOrderStatusEnum;
 use App\Enums\ServiceOrderStatusEnum;
+use App\Enums\StockInStatusEnum;
 use App\Models\Booking;
 use App\Models\CashbookTransaction;
 use App\Models\FixedAssetDepreciation;
@@ -13,6 +14,7 @@ use App\Models\FoodOrder;
 use App\Models\FoodOrderItem;
 use App\Models\InventoryLedger;
 use App\Models\ServiceOrder;
+use App\Models\StockIn;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -48,6 +50,12 @@ class ProfitAndLossReportService
         $operatingExpenses = (float) (clone $manualTransactions)
             ->where('transaction_type', CashbookTransactionTypeEnum::Expense)->sum('amount');
 
+        $purchasing = round((float) StockIn::query()
+            ->where('status', StockInStatusEnum::Posted)
+            ->where('transaction_date', '>=', $start)
+            ->where('transaction_date', '<', $end)
+            ->sum('total_amount'), 2);
+
         $foodCosts = InventoryLedger::query()
             ->where('transaction_type', 'food_order')
             ->where('reference_type', (new FoodOrderItem)->getMorphClass())
@@ -65,7 +73,7 @@ class ProfitAndLossReportService
             ->where('period', '<=', $filters['date_to'])->sum('amount');
         $totalRevenue = $roomRevenue + $foodRevenue + $serviceRevenue + $otherIncome;
         $recordedCosts = $recordedFoodCosts + $recordedStockCosts;
-        $totalExpenses = $operatingExpenses + $depreciation;
+        $totalExpenses = $operatingExpenses + $purchasing + $depreciation;
         $grossProfit = $totalRevenue - $recordedCosts;
         $netProfit = $grossProfit - $totalExpenses;
 
@@ -76,6 +84,7 @@ class ProfitAndLossReportService
                 ['name' => 'Other Income', 'amount' => $this->decimal($serviceRevenue + $otherIncome)],
                 ['name' => 'Total Income', 'amount' => $this->decimal($totalRevenue)],
                 ['name' => 'Operating Expense', 'amount' => $this->decimal($operatingExpenses + $recordedCosts)],
+                ['name' => 'Purchasing', 'amount' => $this->decimal($purchasing)],
                 ['name' => 'Other Expense', 'amount' => $this->decimal(0)],
                 ['name' => 'Depreciation', 'amount' => $this->decimal($depreciation)],
                 ['name' => 'Total Expense', 'amount' => $this->decimal($totalExpenses + $recordedCosts)],
@@ -84,7 +93,7 @@ class ProfitAndLossReportService
             'meta' => [
                 'current_page' => 1,
                 'per_page' => 15,
-                'total' => 9,
+                'total' => 10,
                 'last_page' => 1,
                 'date_from' => $filters['date_from'],
                 'date_to' => $filters['date_to'],
