@@ -59,6 +59,8 @@ Route::prefix('v1/admin')->group(function (): void {
             Route::post('units/{unit}/toggle-active', [UnitController::class, 'toggleActive']);
             Route::apiResource('item-categories', ItemCategoryController::class)->except(['update', 'delete']);
             Route::post('item-categories/{itemCategory}/toggle-active', [ItemCategoryController::class, 'toggleActive']);
+            Route::post('items/import', [ItemController::class, 'import'])->name('admin.items.import');
+            Route::get('items/import-template', [ItemController::class, 'importTemplate'])->name('admin.items.import-template');
             Route::apiResource('items', ItemController::class)->except(['update', 'delete']);
             Route::post('items/price', [ItemController::class, 'updatePrice']);
             Route::post('items/{item}/toggle-active', [ItemController::class, 'toggleActive']);
@@ -67,6 +69,8 @@ Route::prefix('v1/admin')->group(function (): void {
             Route::post('item-unit-conversions/{itemUnitConversion}/toggle-active', [ItemUnitConversionController::class, 'toggleActive']);
             Route::apiResource('menu-categories', MenuCategoryController::class)->except(['update', 'delete']);
             Route::post('menu-categories/{menuCategory}/toggle-active', [MenuCategoryController::class, 'toggleActive']);
+            Route::post('menus/import', [MenuController::class, 'import'])->name('admin.menus.import');
+            Route::get('menus/import-template', [MenuController::class, 'importTemplate'])->name('admin.menus.import-template');
             Route::apiResource('menus', MenuController::class)->except(['update', 'delete']);
             Route::post('menus/{menu}/toggle-active', [MenuController::class, 'toggleActive']);
             Route::post('menus/{menu}/toggle-available', [MenuController::class, 'toggleAvailable']);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Items\ImportItemsRequest;
 use App\Http\Requests\Items\SaveItemRequest;
 use App\Http\Requests\Items\ToggleItemActiveRequest;
 use App\Http\Requests\Items\UpdateItemPriceRequest;
@@ -12,10 +13,12 @@ use App\Http\Resources\Items\ItemWarehouseBalanceResource;
 use App\Models\Item;
 use App\Models\Warehouse;
 use App\Services\ItemPriceHistories\ItemPriceHistoryService;
+use App\Services\Items\ItemImportService;
 use App\Services\Items\ItemService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ItemController extends Controller
 {
@@ -43,6 +46,20 @@ class ItemController extends Controller
             $item,
             status: filled($request->input('id')) ? 200 : 201,
         );
+    }
+
+    public function import(ImportItemsRequest $request, ItemImportService $importService): JsonResponse
+    {
+        return ApiResponse::success(
+            'Items imported successfully.',
+            $importService->import($request->file('file'), $request->user()),
+            status: 201,
+        );
+    }
+
+    public function importTemplate(): BinaryFileResponse
+    {
+        return response()->download(resource_path('item-import-sample.xlsx'));
     }
 
     public function updatePrice(UpdateItemPriceRequest $request): JsonResponse

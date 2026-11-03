@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Menus;
 
+use App\Services\Menus\MenuRecipeValidator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -10,6 +11,12 @@ class SaveMenuRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /** @return array<int, MenuRecipeValidator> */
+    public function after(): array
+    {
+        return [new MenuRecipeValidator];
     }
 
     /**

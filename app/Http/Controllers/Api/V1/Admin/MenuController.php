@@ -3,15 +3,18 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Menus\ImportMenusRequest;
 use App\Http\Requests\Menus\SaveMenuRequest;
 use App\Http\Requests\Menus\ToggleMenuActiveRequest;
 use App\Http\Requests\Menus\ToggleMenuAvailableRequest;
 use App\Http\Resources\Menus\MenuResource;
 use App\Models\Menu;
+use App\Services\Menus\MenuImportService;
 use App\Services\Menus\MenuService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MenuController extends Controller
 {
@@ -50,6 +53,16 @@ class MenuController extends Controller
                 'recipes.unit',
             ])),
         );
+    }
+
+    public function import(ImportMenusRequest $request, MenuImportService $importService): JsonResponse
+    {
+        return ApiResponse::success('Menus imported successfully.', $importService->import($request->file('file')), status: 201);
+    }
+
+    public function importTemplate(): BinaryFileResponse
+    {
+        return response()->download(resource_path('menu-import-sample.xlsx'));
     }
 
     public function destroy(Menu $menu): JsonResponse

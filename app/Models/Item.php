@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
@@ -37,6 +38,27 @@ class Item extends Model implements AuditableContract
     public function unitConversions(): HasMany
     {
         return $this->hasMany(ItemUnitConversion::class);
+    }
+
+    /** @return Collection<int, Unit> */
+    public function availableUnits(): Collection
+    {
+        $units = collect([$this->stockUnit]);
+
+        foreach ($this->unitConversions as $conversion) {
+            if (! $conversion->is_active) {
+                continue;
+            }
+
+            if ($conversion->to_unit_id === $this->stock_unit_id) {
+                $units->push($conversion->fromUnit);
+            } elseif ($conversion->from_unit_id === $this->stock_unit_id) {
+                $units->push($conversion->toUnit);
+            }
+        }
+
+        return $units->filter(fn (?Unit $unit): bool => $unit !== null && $unit->is_active)
+            ->unique('id')->values();
     }
 
     public function stockBalances(): HasMany
