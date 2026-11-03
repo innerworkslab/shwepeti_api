@@ -60,7 +60,7 @@ class ProfitAndLossReportTest extends TestCase
         $stockCost->replicate()->fill(['transaction_type' => 'in', 'total_cost' => 500])->save();
         $stockCost->replicate()->fill(['transaction_type' => 'adjustment_subtract', 'total_cost' => null])->save();
         $stockCost->replicate()->fill(['transaction_date' => '2026-11-01 00:00:00', 'total_cost' => null])->save();
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
             ->assertJsonPath('data', [
@@ -104,7 +104,7 @@ class ProfitAndLossReportTest extends TestCase
         $this->cashEntry('expense', 45, (new StockIn)->getMorphClass());
         $this->cashEntry('expense', 50, (new SupplierApPayment)->getMorphClass());
         $this->cashEntry('expense', 10);
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
             ->assertJsonPath('data.4.amount', '10.00')
@@ -126,7 +126,7 @@ class ProfitAndLossReportTest extends TestCase
         $this->cashEntry('income', 10, date: '2026-10-31 23:59:59');
         $this->cashEntry('income', 500, date: '2026-11-01 00:00:00');
         $this->cashEntry('expense', 500, date: '2026-09-30 23:59:59');
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
             ->assertJsonPath('data.0.amount', '190.00')
@@ -141,7 +141,7 @@ class ProfitAndLossReportTest extends TestCase
         $food = FoodOrder::query()->create(['booking_id' => $booking->id, 'order_no' => 'FO-1', 'status' => 'served', 'total_amount' => 5]);
         $foodItem = $this->foodItem($food);
         $this->inventoryEntry(['transaction_type' => $type, 'reference_type' => (new FoodOrderItem)->getMorphClass(), 'reference_id' => $foodItem->id, 'total_cost' => null]);
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
             ->assertJsonPath('meta.has_missing_costs', true)
@@ -154,7 +154,7 @@ class ProfitAndLossReportTest extends TestCase
 
     public function test_empty_period_returns_zero_totals(): void
     {
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()
             ->assertJsonPath('data.3.amount', '0.00')
@@ -166,7 +166,7 @@ class ProfitAndLossReportTest extends TestCase
     public function test_losses_are_returned_as_negative_amounts(): void
     {
         $this->cashEntry('expense', 20.25);
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.self::PERIOD)->assertOk()->assertJsonPath('data.9.amount', '-20.25');
     }
@@ -177,7 +177,7 @@ class ProfitAndLossReportTest extends TestCase
     #[TestWith(['?date_from=2026-10-31&date_to=2026-10-01', ['date_to']])]
     public function test_invalid_period_returns_422(string $query, array $fields): void
     {
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->getJson(self::ENDPOINT.$query)->assertUnprocessable()->assertJsonValidationErrors($fields);
     }
@@ -192,7 +192,7 @@ class ProfitAndLossReportTest extends TestCase
     #[TestWith(['reservation_administrator'])]
     #[TestWith(['restaurant_administrator'])]
     #[TestWith(['customer_service_administrator'])]
-    public function test_other_roles_receive_403(string $role): void
+    public function test_users_without_report_permission_receive_403(string $role): void
     {
         $this->actingAs(User::factory()->create(['role' => $role]));
 

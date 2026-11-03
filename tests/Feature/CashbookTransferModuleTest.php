@@ -208,7 +208,7 @@ class CashbookTransferModuleTest extends TestCase
         $this->postJson($this->url($portal), [])->assertForbidden();
     }
 
-    public function test_admin_requires_hotel_administrator_role(): void
+    public function test_admin_requires_transfer_permission(): void
     {
         $user = User::factory()->create(['portal_access' => 'admin', 'role' => UserRoleEnum::RestaurantAdministrator]);
         $this->actingAs($user, 'sanctum')->postJson($this->url('admin'), [])->assertForbidden();
@@ -216,7 +216,7 @@ class CashbookTransferModuleTest extends TestCase
 
     private function authenticate(string $portal): void
     {
-        $this->actingAs(User::factory()->create([
+        $this->actingAs(User::factory()->withPermissions()->create([
             'portal_access' => $portal,
             'role' => $portal === 'admin' ? UserRoleEnum::HotelAdministrator : UserRoleEnum::RestaurantAdministrator,
         ]), 'sanctum');

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Users;
 
 use App\Enums\UserPortalAccessEnum;
 use App\Enums\UserRoleEnum;
+use App\Support\PermissionCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -11,7 +12,7 @@ class SaveUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return ! $this->exists('permissions') || $this->user()->can('users.manage_permissions');
     }
 
     /**
@@ -34,6 +35,11 @@ class SaveUserRequest extends FormRequest
             'role' => ['required', Rule::in(UserRoleEnum::values())],
             'portal_access' => ['sometimes', Rule::in(UserPortalAccessEnum::values())],
             'is_active' => ['sometimes', 'boolean'],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*' => ['required', 'string', 'distinct',
+                Rule::in(app(PermissionCatalog::class)->names()),
+                Rule::exists('permissions', 'name')->where('guard_name', 'web'),
+            ],
         ];
     }
 }

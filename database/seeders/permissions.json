@@ -1,0 +1,654 @@
+[
+  {
+    "group": "users",
+    "label": "Users",
+    "permissions": [
+      {
+        "name": "users.view",
+        "label": "View"
+      },
+      {
+        "name": "users.create",
+        "label": "Create"
+      },
+      {
+        "name": "users.update",
+        "label": "Update"
+      },
+      {
+        "name": "users.restore",
+        "label": "Restore"
+      },
+      {
+        "name": "users.manage_permissions",
+        "label": "Manage permissions"
+      }
+    ]
+  },
+  {
+    "group": "room_categories",
+    "label": "Room Categories",
+    "permissions": [
+      {
+        "name": "room_categories.view",
+        "label": "View"
+      },
+      {
+        "name": "room_categories.create",
+        "label": "Create"
+      },
+      {
+        "name": "room_categories.update",
+        "label": "Update"
+      },
+      {
+        "name": "room_categories.toggle_active",
+        "label": "Toggle active"
+      },
+      {
+        "name": "room_categories.restore",
+        "label": "Restore"
+      }
+    ]
+  },
+  {
+    "group": "rooms",
+    "label": "Rooms",
+    "permissions": [
+      {
+        "name": "rooms.view",
+        "label": "View"
+      },
+      {
+        "name": "rooms.create",
+        "label": "Create"
+      },
+      {
+        "name": "rooms.update",
+        "label": "Update"
+      },
+      {
+        "name": "rooms.update_status",
+        "label": "Update status"
+      },
+      {
+        "name": "rooms.restore",
+        "label": "Restore"
+      }
+    ]
+  },
+  {
+    "group": "unit_groups",
+    "label": "Unit Groups",
+    "permissions": [
+      {
+        "name": "unit_groups.view",
+        "label": "View"
+      },
+      {
+        "name": "unit_groups.create",
+        "label": "Create"
+      },
+      {
+        "name": "unit_groups.update",
+        "label": "Update"
+      },
+      {
+        "name": "unit_groups.toggle_active",
+        "label": "Toggle active"
+      }
+    ]
+  },
+  {
+    "group": "units",
+    "label": "Units",
+    "permissions": [
+      {
+        "name": "units.view",
+        "label": "View"
+      },
+      {
+        "name": "units.create",
+        "label": "Create"
+      },
+      {
+        "name": "units.update",
+        "label": "Update"
+      },
+      {
+        "name": "units.toggle_active",
+        "label": "Toggle active"
+      }
+    ]
+  },
+  {
+    "group": "item_categories",
+    "label": "Item Categories",
+    "permissions": [
+      {
+        "name": "item_categories.view",
+        "label": "View"
+      },
+      {
+        "name": "item_categories.create",
+        "label": "Create"
+      },
+      {
+        "name": "item_categories.update",
+        "label": "Update"
+      },
+      {
+        "name": "item_categories.toggle_active",
+        "label": "Toggle active"
+      }
+    ]
+  },
+  {
+    "group": "items",
+    "label": "Items",
+    "permissions": [
+      {
+        "name": "items.view",
+        "label": "View"
+      },
+      {
+        "name": "items.create",
+        "label": "Create"
+      },
+      {
+        "name": "items.update",
+        "label": "Update"
+      },
+      {
+        "name": "items.import",
+        "label": "Import"
+      },
+      {
+        "name": "items.update_price",
+        "label": "Update price"
+      },
+      {
+        "name": "items.toggle_active",
+        "label": "Toggle active"
+      }
+    ]
+  },
+  {
+    "group": "item_unit_conversions",
+    "label": "Item Unit Conversions",
+    "permissions": [
+      {
+        "name": "item_unit_conversions.view",
+        "label": "View"
+      },
+      {
+        "name": "item_unit_conversions.create",
+        "label": "Create"
+      },
+      {
+        "name": "item_unit_conversions.update",
+        "label": "Update"
+      },
+      {
+        "name": "item_unit_conversions.toggle_active",
+        "label": "Toggle active"
+      }
+    ]
+  },
+  {
+    "group": "menu_categories",
+    "label": "Menu Categories",
+    "permissions": [
+      {
+        "name": "menu_categories.view",
+        "label": "View"
+      },
+      {
+        "name": "menu_categories.create",
+        "label": "Create"
+      },
+      {
+        "name": "menu_categories.update",
+        "label": "Update"
+      },
+      {
+        "name": "menu_categories.toggle_active",
+        "label": "Toggle active"
+      }
+    ]
+  },
+  {
+    "group": "menus",
+    "label": "Menus",
+    "permissions": [
+      {
+        "name": "menus.view",
+        "label": "View"
+      },
+      {
+        "name": "menus.create",
+        "label": "Create"
+      },
+      {
+        "name": "menus.update",
+        "label": "Update"
+      },
+      {
+        "name": "menus.import",
+        "label": "Import"
+      },
+      {
+        "name": "menus.toggle_active",
+        "label": "Toggle active"
+      },
+      {
+        "name": "menus.toggle_available",
+        "label": "Toggle available"
+      }
+    ]
+  },
+  {
+    "group": "warehouses",
+    "label": "Warehouses",
+    "permissions": [
+      {
+        "name": "warehouses.view",
+        "label": "View"
+      },
+      {
+        "name": "warehouses.create",
+        "label": "Create"
+      },
+      {
+        "name": "warehouses.update",
+        "label": "Update"
+      },
+      {
+        "name": "warehouses.toggle_active",
+        "label": "Toggle active"
+      }
+    ]
+  },
+  {
+    "group": "stock_ins",
+    "label": "Stock Ins",
+    "permissions": [
+      {
+        "name": "stock_ins.view",
+        "label": "View"
+      },
+      {
+        "name": "stock_ins.create",
+        "label": "Create"
+      },
+      {
+        "name": "stock_ins.update",
+        "label": "Update"
+      },
+      {
+        "name": "stock_ins.update_status",
+        "label": "Update status"
+      }
+    ]
+  },
+  {
+    "group": "stock_outs",
+    "label": "Stock Outs",
+    "permissions": [
+      {
+        "name": "stock_outs.view",
+        "label": "View"
+      },
+      {
+        "name": "stock_outs.create",
+        "label": "Create"
+      },
+      {
+        "name": "stock_outs.update",
+        "label": "Update"
+      },
+      {
+        "name": "stock_outs.update_status",
+        "label": "Update status"
+      }
+    ]
+  },
+  {
+    "group": "inventory_transfers",
+    "label": "Inventory Transfers",
+    "permissions": [
+      {
+        "name": "inventory_transfers.view",
+        "label": "View"
+      },
+      {
+        "name": "inventory_transfers.create",
+        "label": "Create"
+      },
+      {
+        "name": "inventory_transfers.update",
+        "label": "Update"
+      },
+      {
+        "name": "inventory_transfers.update_status",
+        "label": "Update status"
+      }
+    ]
+  },
+  {
+    "group": "inventory_adjustments",
+    "label": "Inventory Adjustments",
+    "permissions": [
+      {
+        "name": "inventory_adjustments.view",
+        "label": "View"
+      },
+      {
+        "name": "inventory_adjustments.create",
+        "label": "Create"
+      },
+      {
+        "name": "inventory_adjustments.update",
+        "label": "Update"
+      },
+      {
+        "name": "inventory_adjustments.update_status",
+        "label": "Update status"
+      }
+    ]
+  },
+  {
+    "group": "inventory_ledgers",
+    "label": "Inventory Ledgers",
+    "permissions": [
+      {
+        "name": "inventory_ledgers.view",
+        "label": "View"
+      }
+    ]
+  },
+  {
+    "group": "inventory_stock_balances",
+    "label": "Inventory Stock Balances",
+    "permissions": [
+      {
+        "name": "inventory_stock_balances.view",
+        "label": "View"
+      }
+    ]
+  },
+  {
+    "group": "audit_logs",
+    "label": "Audit Logs",
+    "permissions": [
+      {
+        "name": "audit_logs.view",
+        "label": "View"
+      }
+    ]
+  },
+  {
+    "group": "cashbooks",
+    "label": "Cashbooks",
+    "permissions": [
+      {
+        "name": "cashbooks.view",
+        "label": "View"
+      },
+      {
+        "name": "cashbooks.create",
+        "label": "Create"
+      },
+      {
+        "name": "cashbooks.update",
+        "label": "Update"
+      },
+      {
+        "name": "cashbooks.close",
+        "label": "Close"
+      },
+      {
+        "name": "cashbooks.toggle_active",
+        "label": "Toggle active"
+      }
+    ]
+  },
+  {
+    "group": "cashbook_transactions",
+    "label": "Cashbook Transactions",
+    "permissions": [
+      {
+        "name": "cashbook_transactions.view",
+        "label": "View"
+      },
+      {
+        "name": "cashbook_transactions.create",
+        "label": "Create"
+      }
+    ]
+  },
+  {
+    "group": "cashbook_transfers",
+    "label": "Cashbook Transfers",
+    "permissions": [
+      {
+        "name": "cashbook_transfers.view",
+        "label": "View"
+      },
+      {
+        "name": "cashbook_transfers.create",
+        "label": "Create"
+      }
+    ]
+  },
+  {
+    "group": "asset_categories",
+    "label": "Asset Categories",
+    "permissions": [
+      {
+        "name": "asset_categories.view",
+        "label": "View"
+      },
+      {
+        "name": "asset_categories.create",
+        "label": "Create"
+      },
+      {
+        "name": "asset_categories.update",
+        "label": "Update"
+      },
+      {
+        "name": "asset_categories.toggle_active",
+        "label": "Toggle active"
+      }
+    ]
+  },
+  {
+    "group": "fixed_assets",
+    "label": "Fixed Assets",
+    "permissions": [
+      {
+        "name": "fixed_assets.view",
+        "label": "View"
+      },
+      {
+        "name": "fixed_assets.create",
+        "label": "Create"
+      },
+      {
+        "name": "fixed_assets.update",
+        "label": "Update"
+      },
+      {
+        "name": "fixed_assets.update_depreciation_settings",
+        "label": "Update depreciation settings"
+      },
+      {
+        "name": "fixed_assets.update_status",
+        "label": "Update status"
+      }
+    ]
+  },
+  {
+    "group": "suppliers",
+    "label": "Suppliers",
+    "permissions": [
+      {
+        "name": "suppliers.view",
+        "label": "View"
+      },
+      {
+        "name": "suppliers.create",
+        "label": "Create"
+      },
+      {
+        "name": "suppliers.update",
+        "label": "Update"
+      },
+      {
+        "name": "suppliers.toggle_active",
+        "label": "Toggle active"
+      },
+      {
+        "name": "suppliers.restore",
+        "label": "Restore"
+      }
+    ]
+  },
+  {
+    "group": "supplier_ap_payments",
+    "label": "Supplier Ap Payments",
+    "permissions": [
+      {
+        "name": "supplier_ap_payments.view",
+        "label": "View"
+      },
+      {
+        "name": "supplier_ap_payments.create",
+        "label": "Create"
+      },
+      {
+        "name": "supplier_ap_payments.update",
+        "label": "Update"
+      },
+      {
+        "name": "supplier_ap_payments.update_status",
+        "label": "Update status"
+      }
+    ]
+  },
+  {
+    "group": "supplier_ap_balances",
+    "label": "Supplier Ap Balances",
+    "permissions": [
+      {
+        "name": "supplier_ap_balances.view",
+        "label": "View"
+      }
+    ]
+  },
+  {
+    "group": "supplier_ap_ledgers",
+    "label": "Supplier Ap Ledgers",
+    "permissions": [
+      {
+        "name": "supplier_ap_ledgers.view",
+        "label": "View"
+      }
+    ]
+  },
+  {
+    "group": "reports",
+    "label": "Reports",
+    "permissions": [
+      {
+        "name": "reports.profit_and_loss",
+        "label": "Profit and loss"
+      },
+      {
+        "name": "reports.hotel",
+        "label": "Hotel"
+      }
+    ]
+  },
+  {
+    "group": "bookings",
+    "label": "Bookings",
+    "permissions": [
+      {
+        "name": "bookings.view",
+        "label": "View"
+      },
+      {
+        "name": "bookings.create",
+        "label": "Create"
+      },
+      {
+        "name": "bookings.record_payment",
+        "label": "Record payment"
+      },
+      {
+        "name": "bookings.check_in",
+        "label": "Check in"
+      },
+      {
+        "name": "bookings.checkout",
+        "label": "Checkout"
+      },
+      {
+        "name": "bookings.check_out",
+        "label": "Check out"
+      },
+      {
+        "name": "bookings.cancel",
+        "label": "Cancel"
+      }
+    ]
+  },
+  {
+    "group": "food_orders",
+    "label": "Food Orders",
+    "permissions": [
+      {
+        "name": "food_orders.view",
+        "label": "View"
+      },
+      {
+        "name": "food_orders.create",
+        "label": "Create"
+      },
+      {
+        "name": "food_orders.update_status",
+        "label": "Update status"
+      }
+    ]
+  },
+  {
+    "group": "service_orders",
+    "label": "Service Orders",
+    "permissions": [
+      {
+        "name": "service_orders.view",
+        "label": "View"
+      },
+      {
+        "name": "service_orders.create",
+        "label": "Create"
+      },
+      {
+        "name": "service_orders.update_status",
+        "label": "Update status"
+      }
+    ]
+  },
+  {
+    "group": "booking_dashboard",
+    "label": "Booking Dashboard",
+    "permissions": [
+      {
+        "name": "booking_dashboard.view",
+        "label": "View"
+      }
+    ]
+  }
+]

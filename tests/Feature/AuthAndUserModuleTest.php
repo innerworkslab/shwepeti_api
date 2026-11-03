@@ -14,7 +14,7 @@ class AuthAndUserModuleTest extends TestCase
 
     public function test_it_logs_in_an_active_staff_user_and_returns_a_bearer_token(): void
     {
-        User::factory()->create([
+        User::factory()->withPermissions()->create([
             'email' => 'admin@example.com',
             'password' => 'password',
             'role' => UserRoleEnum::HotelAdministrator->value,
@@ -34,7 +34,7 @@ class AuthAndUserModuleTest extends TestCase
 
     public function test_it_logs_in_a_pos_user_through_the_pos_portal(): void
     {
-        User::factory()->create([
+        User::factory()->withPermissions()->create([
             'email' => 'cashier@example.com',
             'password' => 'password',
             'role' => UserRoleEnum::RestaurantAdministrator->value,
@@ -84,9 +84,9 @@ class AuthAndUserModuleTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
-    public function test_it_allows_a_hotel_administrator_to_create_update_delete_and_restore_users(): void
+    public function test_it_allows_a_permitted_user_to_create_update_delete_and_restore_users(): void
     {
-        $admin = User::factory()->create([
+        $admin = User::factory()->withPermissions()->create([
             'email' => 'admin@example.com',
             'password' => 'password',
             'role' => UserRoleEnum::HotelAdministrator->value,
@@ -146,13 +146,13 @@ class AuthAndUserModuleTest extends TestCase
 
     public function test_it_accepts_per_page_as_camel_case_for_admin_lists(): void
     {
-        $admin = User::factory()->create([
+        $admin = User::factory()->withPermissions()->create([
             'email' => 'admin@example.com',
             'password' => 'password',
             'role' => UserRoleEnum::HotelAdministrator->value,
         ]);
 
-        User::factory()->count(3)->create();
+        User::factory()->withPermissions()->count(3)->create();
 
         $token = $this->postJson('/api/v1/admin/login', [
             'email' => $admin->email,
@@ -166,7 +166,7 @@ class AuthAndUserModuleTest extends TestCase
             ->assertJsonPath('meta.per_page', 2);
     }
 
-    public function test_it_blocks_non_hotel_administrators_from_user_management(): void
+    public function test_it_blocks_users_without_permission_from_user_management(): void
     {
         $frontOffice = User::factory()->create([
             'email' => 'front@example.com',

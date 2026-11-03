@@ -30,7 +30,7 @@ class FixedAssetDepreciationTest extends TestCase
         $this->assertDatabaseCount('cashbook_transactions', 0);
         $this->assertSame('10000.00', $asset->cashbook->current_balance);
 
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
         $this->getJson("/api/v1/admin/fixed-assets/{$asset->id}")
             ->assertOk()->assertJsonPath('data.book_value', '100.00')->assertJsonPath('data.accumulated_depreciation', '900.00');
         $this->getJson("/api/v1/admin/fixed-assets/{$asset->id}/depreciations")
@@ -82,7 +82,7 @@ class FixedAssetDepreciationTest extends TestCase
     public function test_existing_posted_assets_can_be_configured_without_changing_purchase_details(): void
     {
         $asset = FixedAsset::factory()->create(['status' => 'posted']);
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->postJson("/api/v1/admin/fixed-assets/{$asset->id}/depreciation-settings", $this->settings() + ['purchase_amount' => 1])
             ->assertOk()->assertJsonPath('data.depreciation_enabled', true)->assertJsonPath('data.purchase_amount', '1000.00');
@@ -96,7 +96,7 @@ class FixedAssetDepreciationTest extends TestCase
     public function test_settings_cannot_change_after_history_exists(): void
     {
         $entry = FixedAssetDepreciation::factory()->create();
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->postJson("/api/v1/admin/fixed-assets/{$entry->fixed_asset_id}/depreciation-settings", ['depreciation_enabled' => false])
             ->assertUnprocessable()->assertJsonValidationErrors('depreciation_enabled');
@@ -115,7 +115,7 @@ class FixedAssetDepreciationTest extends TestCase
     public function test_invalid_settings_return_422_without_changes(string $field, mixed $value): void
     {
         $asset = FixedAsset::factory()->create(['status' => 'posted']);
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->postJson("/api/v1/admin/fixed-assets/{$asset->id}/depreciation-settings", array_replace($this->settings(), [$field => $value]))
             ->assertUnprocessable()->assertJsonValidationErrors($field);
@@ -126,7 +126,7 @@ class FixedAssetDepreciationTest extends TestCase
     public function test_draft_save_accepts_depreciation_and_requires_settings_when_enabled(): void
     {
         $asset = FixedAsset::factory()->create();
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
         $data = $asset->only(['id', 'asset_code', 'asset_category_id', 'cashbook_id', 'name', 'purchase_amount']);
         $data['purchase_date'] = '2026-01-01';
 
@@ -150,7 +150,7 @@ class FixedAssetDepreciationTest extends TestCase
     public function test_draft_purchase_changes_revalidate_existing_depreciation_settings(): void
     {
         $asset = $this->depreciableAsset(['status' => 'draft']);
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
         $data = $asset->only(['id', 'asset_code', 'asset_category_id', 'cashbook_id', 'name', 'purchase_amount']);
         $data['purchase_date'] = '2026-02-01';
 
@@ -168,7 +168,7 @@ class FixedAssetDepreciationTest extends TestCase
     public function test_cancelled_assets_reject_settings_changes(): void
     {
         $asset = FixedAsset::factory()->create(['status' => 'cancelled']);
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->postJson("/api/v1/admin/fixed-assets/{$asset->id}/depreciation-settings", $this->settings())
             ->assertUnprocessable()->assertJsonValidationErrors('depreciation_enabled');

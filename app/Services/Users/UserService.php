@@ -14,6 +14,7 @@ class UserService
     public function paginate(array $filters = []): LengthAwarePaginator|Collection
     {
         $query = User::query()
+            ->with('permissions')
             ->filter($filters)
             ->latest();
 
@@ -48,7 +49,11 @@ class UserService
 
             $user = User::query()->updateOrCreate(['id' => $data['id'] ?? null], $values);
 
-            return new UserResource($user->refresh());
+            if (array_key_exists('permissions', $data)) {
+                $user->syncPermissions($data['permissions']);
+            }
+
+            return new UserResource($user->refresh()->load('permissions'));
         });
     }
 

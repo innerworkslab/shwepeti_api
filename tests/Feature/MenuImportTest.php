@@ -137,7 +137,7 @@ class MenuImportTest extends TestCase
         $this->assertDatabaseMissing('menus', ['code' => 'NEW_TEA']);
     }
 
-    public function test_menu_import_requires_administrator_authentication(): void
+    public function test_menu_import_requires_authentication_and_import_permission(): void
     {
         $this->postJson('/api/v1/admin/menus/import')->assertUnauthorized();
         $this->actingAs(User::factory()->create(['role' => UserRoleEnum::InventoryAdministrator]));
@@ -146,14 +146,14 @@ class MenuImportTest extends TestCase
 
     public function test_sample_download_and_missing_upload_validation(): void
     {
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
         $this->get('/api/v1/admin/menus/import-template')->assertOk()->assertDownload('menu-import-sample.xlsx');
         $this->postJson('/api/v1/admin/menus/import')->assertUnprocessable()->assertJsonValidationErrors(['file']);
     }
 
     private function prepareInventory(): void
     {
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
         $groupId = $this->postJson('/api/v1/admin/unit-groups', ['name' => 'Import Units'])->assertCreated()->json('data.id');
         foreach (['kg', 'g', 'box', 'l'] as $symbol) {
             $this->postJson('/api/v1/admin/units', ['unit_group_id' => $groupId, 'name' => $symbol, 'symbol' => $symbol])->assertCreated();

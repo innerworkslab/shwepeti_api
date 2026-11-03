@@ -13,9 +13,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use Spatie\Permission\Contracts\Permission;
+use Spatie\Permission\Traits\HasPermissions;
 
 #[Fillable([
     'name',
@@ -33,7 +36,32 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 class User extends Authenticatable implements AuditableContract
 {
     /** @use HasFactory<UserFactory> */
-    use Auditable, HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use Auditable, HasApiTokens, HasFactory, HasPermissions, Notifiable, SoftDeletes;
+
+    protected function getDefaultGuardName(): string
+    {
+        return 'web';
+    }
+
+    /** The role field is a staff classification, never a source of permissions. */
+    protected function hasPermissionViaRole(Permission $permission): bool
+    {
+        return false;
+    }
+
+    public function getPermissionsViaRoles(): Collection
+    {
+        return collect();
+    }
+
+    public function scopePermission(Builder $query, mixed $permissions, bool $without = false): Builder
+    {
+        $permissionModels = $this->convertToPermissionModels($permissions);
+        $permissionIds = array_map(fn (Permission $permission): int|string => $permission->getKey(), $permissionModels);
+
+        return $query->{ $without ? 'whereDoesntHave' : 'whereHas' }('permissions',
+            fn (Builder $permissionQuery): Builder => $permissionQuery->whereIn('permissions.id', $permissionIds));
+    }
 
     public function isHotelAdministrator(): bool
     {

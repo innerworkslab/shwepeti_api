@@ -322,7 +322,7 @@ class ItemManagementModuleTest extends TestCase
      */
     private function authHeaders(): array
     {
-        $admin = User::factory()->create([
+        $admin = User::factory()->withPermissions()->create([
             'email' => fake()->unique()->safeEmail(),
             'password' => 'password',
             'role' => UserRoleEnum::HotelAdministrator->value,

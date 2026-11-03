@@ -41,12 +41,12 @@ class HotelReportTest extends TestCase
     #[TestWith(['inventory-balance'])]
     #[TestWith(['low-stock'])]
     #[TestWith(['depreciation'])]
-    public function test_reports_require_authentication_and_hotel_administrator_access(string $report): void
+    public function test_reports_require_authentication_and_report_permission(string $report): void
     {
         $this->getJson(self::BASE.$report)->assertUnauthorized();
         $this->actingAs(User::factory()->create(['role' => 'front_office_administrator']))
             ->getJson(self::BASE.$report)->assertForbidden();
-        $this->actingAs(User::factory()->create(['role' => 'hotel_administrator']))
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => 'hotel_administrator']))
             ->getJson(self::BASE.$report.'?date=2026-10-22')->assertOk()
             ->assertJsonPath('meta.report', $report)
             ->assertJsonPath('success', true)
@@ -300,7 +300,7 @@ class HotelReportTest extends TestCase
     private function admin(): void
     {
         $this->travelTo(Carbon::parse('2026-10-23 12:00:00'));
-        $this->actingAs(User::factory()->create(['role' => 'hotel_administrator']));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => 'hotel_administrator']));
     }
 
     /** @param array<string, mixed> $attributes */

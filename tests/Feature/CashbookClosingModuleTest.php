@@ -189,7 +189,7 @@ class CashbookClosingModuleTest extends TestCase
         $this->assertDatabaseCount('cashbook_closings', 0);
     }
 
-    public function test_admin_endpoints_return_403_without_the_required_role(): void
+    public function test_admin_endpoints_return_403_without_the_required_permissions(): void
     {
         $user = User::factory()->create(['role' => UserRoleEnum::RestaurantAdministrator, 'portal_access' => UserPortalAccessEnum::Admin]);
         $this->actingAs($user, 'sanctum');
@@ -261,7 +261,7 @@ class CashbookClosingModuleTest extends TestCase
 
     private function authenticate(string $portal): User
     {
-        $user = User::factory()->create([
+        $user = User::factory()->withPermissions()->create([
             'role' => UserRoleEnum::HotelAdministrator,
             'portal_access' => $portal === 'admin' ? UserPortalAccessEnum::Admin : UserPortalAccessEnum::Pos,
         ]);

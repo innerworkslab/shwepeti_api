@@ -206,7 +206,7 @@ class PosCashbookModuleTest extends TestCase
      */
     private function posAuthHeaders(): array
     {
-        $user = User::factory()->create([
+        $user = User::factory()->withPermissions()->create([
             'email' => fake()->unique()->safeEmail(),
             'password' => 'password',
             'role' => UserRoleEnum::RestaurantAdministrator->value,

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureFeaturePermission;
 use App\Http\Middleware\EnsureUserPortalAccess;
 use App\Http\Middleware\EnsureUserRole;
 use App\Http\Middleware\NormalizePaginationRequest;
@@ -8,8 +9,10 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -27,12 +30,21 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'portal' => EnsureUserPortalAccess::class,
             'role' => EnsureUserRole::class,
+            'feature' => EnsureFeaturePermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        $exceptions->render(function (AccessDeniedHttpException $exception, Request $request): ?JsonResponse {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return ApiResponse::error('Forbidden.', status: 403);
+            }
+
+            return null;
+        });
 
         $exceptions->render(function (ValidationException $exception, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {

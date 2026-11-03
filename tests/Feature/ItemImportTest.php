@@ -85,7 +85,7 @@ class ItemImportTest extends TestCase
 
     public function test_missing_file_returns_422(): void
     {
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->postJson('/api/v1/admin/items/import')->assertUnprocessable()->assertJsonValidationErrors(['file']);
     }
@@ -140,7 +140,7 @@ class ItemImportTest extends TestCase
         $this->postJson('/api/v1/admin/items/import')->assertUnauthorized();
     }
 
-    public function test_import_forbids_non_hotel_administrators(): void
+    public function test_import_forbids_users_without_import_permission(): void
     {
         $this->actingAs(User::factory()->create(['role' => UserRoleEnum::InventoryAdministrator]));
 
@@ -150,7 +150,7 @@ class ItemImportTest extends TestCase
 
     public function test_administrator_can_download_sample_workbook(): void
     {
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->get('/api/v1/admin/items/import-template')->assertOk()->assertDownload('item-import-sample.xlsx');
     }
@@ -172,7 +172,7 @@ class ItemImportTest extends TestCase
 
     public function test_corrupt_workbook_returns_422(): void
     {
-        $this->actingAs(User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]));
+        $this->actingAs(User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]));
 
         $this->postJson('/api/v1/admin/items/import', [
             'file' => UploadedFile::fake()->createWithContent('broken.xlsx', 'not an Excel workbook'),
@@ -181,7 +181,7 @@ class ItemImportTest extends TestCase
 
     private function prepareInventory(): User
     {
-        $actor = User::factory()->create(['role' => UserRoleEnum::HotelAdministrator]);
+        $actor = User::factory()->withPermissions()->create(['role' => UserRoleEnum::HotelAdministrator]);
         $this->actingAs($actor);
         $groupId = $this->postJson('/api/v1/admin/unit-groups', ['name' => 'Import Units'])->assertCreated()->json('data.id');
         foreach (['kg', 'g', 'box'] as $symbol) {
