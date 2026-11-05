@@ -21,7 +21,7 @@ class HotelReportService
      * @param  array{date?: string, date_from?: string, date_to?: string, room_id?: int, room_category_id?: int, item_category_id?: int, warehouse_id?: int, page?: int, per_page?: int}  $filters
      * @return array<string, mixed>
      */
-    public function get(string $report, array $filters): array
+    public function get(string $report, array $filters, bool $paginate = true): array
     {
         $start = CarbonImmutable::parse($filters['date'] ?? $filters['date_from'] ?? today()->toDateString())->startOfDay();
         $end = CarbonImmutable::parse($filters['date'] ?? $filters['date_to'] ?? today()->toDateString())->addDay()->startOfDay();
@@ -50,7 +50,7 @@ class HotelReportService
             'date_from' => $start->toDateString(),
             'date_to' => $end->subDay()->toDateString(),
             'currency' => 'MMK',
-            'rows' => $rows->forPage($page, $perPage)->values()->all(),
+            'rows' => $paginate ? $rows->forPage($page, $perPage)->values()->all() : $rows->values()->all(),
             'pagination' => ['current_page' => $page, 'per_page' => $perPage, 'total' => $rows->count(), 'last_page' => max(1, (int) ceil($rows->count() / $perPage))],
         ]);
     }

@@ -23,7 +23,9 @@ use App\Models\Warehouse;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\TestWith;
+use SimpleXMLElement;
 use Tests\TestCase;
+use ZipArchive;
 
 class HotelReportTest extends TestCase
 {
@@ -295,6 +297,105 @@ class HotelReportTest extends TestCase
             ->assertJsonPath('data.1.total_rooms', 5)
             ->assertJsonPath('data.1.occupied_rooms', 1)
             ->assertJsonPath('data.1.available_rooms', 4);
+    }
+
+    #[TestWith(['daily-summary', 'Date'])]
+    #[TestWith(['room-occupancy', 'Booking Id'])]
+    #[TestWith(['room-revenue', 'Booking Id'])]
+    #[TestWith(['guest-balances', 'Booking Id'])]
+    #[TestWith(['food-sales', 'Date'])]
+    #[TestWith(['top-selling-items', 'Menu Id'])]
+    #[TestWith(['other-bills', 'Date'])]
+    #[TestWith(['inventory-balance', 'Item Id'])]
+    #[TestWith(['low-stock', 'Item Id'])]
+    #[TestWith(['depreciation', 'Asset Id'])]
+    public function test_excel_exports_require_permission_and_produce_workbooks_with_headers(string $report, string $firstHeader): void
+    {
+        $endpoint = self::BASE.$report.'/export?date=2026-10-22';
+        $this->getJson($endpoint)->assertUnauthorized();
+        $this->actingAs(User::factory()->create(['role' => 'front_office_administrator']))
+            ->getJson($endpoint)->assertForbidden();
+        $this->admin();
+
+        $response = $this->getJson($endpoint)->assertOk()
+            ->assertDownload($report.'_2026-10-22_2026-10-22.xlsx')
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $sheets = $this->workbookSheets($response->streamedContent());
+
+        $this->assertSame($firstHeader, (string) $sheets[0]->sheetData->row[0]->c[0]->is->t);
+        $this->assertSame($report, (string) $sheets[1]->sheetData->row[0]->c[1]->is->t);
+        $this->assertSame('MMK', (string) $sheets[1]->sheetData->row[3]->c[1]->is->t);
+    }
+
+    public function test_excel_export_contains_all_filtered_rows_numeric_amounts_and_safe_unicode_text(): void
+    {
+        $this->admin();
+        $guest = '=SUM(1,2) & <ဧည့်သည်>';
+        $booking = $this->booking(['guest_name' => $guest, 'total_amount' => 123.45]);
+        $booking->room->update(['name' => '001']);
+        $this->booking(['room_id' => $booking->room_id, 'total_amount' => 200]);
+        $this->booking(['total_amount' => 999]);
+        $this->booking(['room_id' => $booking->room_id, 'checked_out_at' => '2026-10-23 00:00:00']);
+
+        $response = $this->getJson(self::BASE.'room-revenue/export?date=2026-10-22&room_id='.$booking->room_id.'&page=2&per_page=1')->assertOk();
+        $sheets = $this->workbookSheets($response->streamedContent());
+        $rows = $sheets[0]->sheetData->row;
+
+        $this->assertCount(3, $rows);
+        $this->assertSame('001', (string) $rows[1]->c[2]->is->t);
+        $this->assertSame($guest, (string) $rows[1]->c[3]->is->t);
+        $this->assertSame('inlineStr', (string) $rows[1]->c[3]['t']);
+        $this->assertSame('123.45', (string) $rows[1]->c[10]->v);
+        $this->assertSame('200.00', (string) $rows[2]->c[10]->v);
+        $this->assertSame('323.45', (string) $sheets[1]->sheetData->row[4]->c[1]->is->t);
+        $this->assertStringContainsString('Room revenue uses checkout date', (string) $sheets[1]->sheetData->row[5]->c[1]->is->t);
+        $this->assertCount(0, $sheets[0]->xpath('//*[local-name()="f"]'));
+    }
+
+    public function test_excel_export_ignores_pagination_for_more_than_one_hundred_rows(): void
+    {
+        $this->admin();
+
+        $response = $this->getJson(self::BASE.'daily-summary/export?date_from=2026-01-01&date_to=2026-04-30&page=3&per_page=1')->assertOk();
+        $sheets = $this->workbookSheets($response->streamedContent());
+
+        $this->assertCount(121, $sheets[0]->sheetData->row);
+        $this->assertSame('2026-01-01', (string) $sheets[0]->sheetData->row[1]->c[0]->is->t);
+        $this->assertSame('2026-04-30', (string) $sheets[0]->sheetData->row[120]->c[0]->is->t);
+    }
+
+    public function test_excel_exports_validate_filters_and_reject_unknown_reports(): void
+    {
+        $this->admin();
+
+        $this->getJson(self::BASE.'room-revenue/export?date=invalid')->assertUnprocessable()->assertJsonValidationErrors('date');
+        $this->getJson(self::BASE.'daily-summary/export?date_from=2024-01-01&date_to=2026-10-22')
+            ->assertUnprocessable()->assertJsonValidationErrors('date_to');
+        $this->getJson(self::BASE.'unknown/export')->assertNotFound();
+    }
+
+    /** @return array<int, SimpleXMLElement> */
+    private function workbookSheets(string $contents): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'report-test-');
+        file_put_contents($path, $contents);
+        $zip = new ZipArchive;
+        try {
+            $this->assertTrue($zip->open($path) === true);
+            $this->assertNotFalse(simplexml_load_string($zip->getFromName('[Content_Types].xml')));
+            $this->assertNotFalse(simplexml_load_string($zip->getFromName('xl/workbook.xml')));
+            $sheets = [];
+            foreach (['xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml'] as $name) {
+                $sheet = simplexml_load_string($zip->getFromName($name));
+                $this->assertInstanceOf(SimpleXMLElement::class, $sheet);
+                $sheets[] = $sheet;
+            }
+
+            return $sheets;
+        } finally {
+            $zip->close();
+            unlink($path);
+        }
     }
 
     private function admin(): void

@@ -45,6 +45,9 @@ Route::prefix('v1/admin')->group(function (): void {
         Route::get('reports/{report}', [HotelReportController::class, 'index'])->middleware('feature:reports.hotel')
             ->whereIn('report', ['daily-summary', 'room-occupancy', 'room-revenue', 'guest-balances', 'food-sales', 'top-selling-items', 'other-bills', 'inventory-balance', 'low-stock', 'depreciation'])
             ->name('admin.reports.hotel');
+        Route::get('reports/{report}/export', [HotelReportController::class, 'export'])->middleware('feature:reports.hotel')
+            ->whereIn('report', ['daily-summary', 'room-occupancy', 'room-revenue', 'guest-balances', 'food-sales', 'top-selling-items', 'other-bills', 'inventory-balance', 'low-stock', 'depreciation'])
+            ->name('admin.reports.hotel.export');
         Route::apiResource('users', UserController::class)->except(['update', 'delete'])
             ->middlewareFor('index', 'feature:users.view')
             ->middlewareFor('show', 'feature:users.view')
