@@ -16,6 +16,120 @@ class PosCashbookModuleTest extends TestCase
 {
     use RefreshDatabase;
 
+    #[DataProvider('validTransactionStores')]
+    public function test_it_stores_pos_transactions_and_updates_balance(string $cashbookType, string $transactionType, string $balance): void
+    {
+        $cashbook = $this->createCashbook(['type' => $cashbookType, 'opening_balance' => 1000]);
+        $user = User::factory()->withPermissions(['cashbook_transactions.create'])->create([
+            'portal_access' => UserPortalAccessEnum::Pos->value,
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/pos/cashbook-transactions', [
+            'cashbook_id' => $cashbook->id,
+            'transaction_type' => $transactionType,
+            'amount' => 250,
+            'transaction_date' => '2026-11-06',
+            'remark' => 'POS transaction',
+            'created_by' => 999999,
+            'balance_after' => 999999,
+        ])->assertCreated()
+            ->assertJsonPath('data.cashbook_id', $cashbook->id)
+            ->assertJsonPath('data.transaction_type', $transactionType)
+            ->assertJsonPath('data.amount', '250.00')
+            ->assertJsonPath('data.balance_after', $balance)
+            ->assertJsonPath('data.created_by', $user->id);
+
+        $this->assertDatabaseHas('cashbook_transactions', [
+            'id' => $response->json('data.id'),
+            'reference_no' => $response->json('data.reference_no'),
+            'cashbook_id' => $cashbook->id,
+            'transaction_type' => $transactionType,
+            'amount' => 250,
+            'balance_after' => $balance,
+            'created_by' => $user->id,
+            'remark' => 'POS transaction',
+        ]);
+        $this->assertSame($balance, $cashbook->fresh()->current_balance);
+    }
+
+    public static function validTransactionStores(): array
+    {
+        return [
+            'cash income' => ['pos_cash', 'income', '1250.00'],
+            'cash expense' => ['pos_cash', 'expense', '750.00'],
+            'bank income' => ['pos_bank', 'income', '1250.00'],
+            'bank expense' => ['pos_bank', 'expense', '750.00'],
+        ];
+    }
+
+    #[DataProvider('invalidTransactionStores')]
+    public function test_transaction_store_returns_422_without_changing_balance(array $cashbookOverrides, array $payloadOverrides, string $field): void
+    {
+        $cashbook = $this->createCashbook(array_merge([
+            'type' => CashbookTypeEnum::PosCash->value,
+            'opening_balance' => 1000,
+        ], $cashbookOverrides));
+
+        $this->withHeaders($this->posAuthHeaders())
+            ->postJson('/api/v1/pos/cashbook-transactions', array_merge([
+                'cashbook_id' => $cashbook->id,
+                'transaction_type' => 'income',
+                'amount' => 250,
+                'transaction_date' => '2026-11-06',
+            ], $payloadOverrides))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($field);
+
+        $this->assertDatabaseCount('cashbook_transactions', 0);
+        $this->assertSame('1000.00', $cashbook->fresh()->current_balance);
+    }
+
+    public static function invalidTransactionStores(): array
+    {
+        return [
+            'admin cash' => [['type' => 'cash'], [], 'cashbook_id'],
+            'admin bank' => [['type' => 'bank'], [], 'cashbook_id'],
+            'inactive cashbook' => [['is_active' => false], [], 'cashbook_id'],
+            'insufficient balance' => [[], ['transaction_type' => 'expense', 'amount' => 1001], 'amount'],
+            'invalid type' => [[], ['transaction_type' => 'transfer'], 'transaction_type'],
+            'zero amount' => [[], ['amount' => 0], 'amount'],
+            'invalid date' => [[], ['transaction_date' => 'invalid'], 'transaction_date'],
+            'missing cashbook' => [[], ['cashbook_id' => 999999], 'cashbook_id'],
+        ];
+    }
+
+    public function test_transaction_store_returns_401_without_authentication(): void
+    {
+        $this->postJson('/api/v1/pos/cashbook-transactions')->assertUnauthorized();
+        $this->assertDatabaseCount('cashbook_transactions', 0);
+    }
+
+    public function test_transaction_store_returns_403_without_pos_access(): void
+    {
+        $user = User::factory()->withPermissions(['cashbook_transactions.create'])->create([
+            'portal_access' => UserPortalAccessEnum::Admin->value,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/pos/cashbook-transactions')
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('cashbook_transactions', 0);
+    }
+
+    public function test_transaction_store_returns_403_with_only_view_permission(): void
+    {
+        $user = User::factory()->withPermissions(['cashbook_transactions.view'])->create([
+            'portal_access' => UserPortalAccessEnum::Pos->value,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/pos/cashbook-transactions')
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('cashbook_transactions', 0);
+    }
+
     public function test_it_lists_active_cashbooks_for_pos(): void
     {
         $this->createCashbook([

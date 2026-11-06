@@ -32,8 +32,9 @@ Route::prefix('v1/pos')->name('pos.')->group(function (): void {
             ->middlewareFor('index', 'feature:cashbooks.view');
         Route::post('cashbooks/close', [CashbookController::class, 'close'])->middleware('feature:cashbooks.close');
         Route::get('cashbooks/{cashbook}/closings', [CashbookController::class, 'closings'])->middleware('feature:cashbooks.view');
-        Route::apiResource('cashbook-transactions', CashbookTransactionController::class)->only(['index'])
-            ->middlewareFor('index', 'feature:cashbook_transactions.view');
+        Route::apiResource('cashbook-transactions', CashbookTransactionController::class)->only(['index', 'store'])
+            ->middlewareFor('index', 'feature:cashbook_transactions.view')
+            ->middlewareFor('store', 'feature:cashbook_transactions.create');
         Route::apiResource('cashbook-transfers', CashbookTransferController::class)->only(['index', 'store', 'show'])
             ->middlewareFor('index', 'feature:cashbook_transfers.view')
             ->middlewareFor('store', 'feature:cashbook_transfers.create')

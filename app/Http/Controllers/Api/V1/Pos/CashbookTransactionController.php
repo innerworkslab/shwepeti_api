@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Pos;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Pos\CashbookTransactions\ListCashbookTransactionRequest;
+use App\Http\Requests\Pos\CashbookTransactions\SaveCashbookTransactionRequest;
 use App\Http\Resources\CashbookTransactions\CashbookTransactionResource;
 use App\Services\CashbookTransactions\CashbookTransactionService;
 use App\Support\ApiResponse;
@@ -23,5 +24,12 @@ class CashbookTransactionController extends Controller
             CashbookTransactionResource::collection($transactions),
             extra: $this->cashbookTransactionService->summary($filters),
         );
+    }
+
+    public function store(SaveCashbookTransactionRequest $request): JsonResponse
+    {
+        $transaction = $this->cashbookTransactionService->post($request->validated(), $request->user());
+
+        return ApiResponse::resource('Cashbook transaction posted successfully.', $transaction, status: 201);
     }
 }
