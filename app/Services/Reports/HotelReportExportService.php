@@ -9,6 +9,8 @@ use ZipArchive;
 class HotelReportExportService
 {
     private const COLUMNS = [
+        'cashbook-transactions' => ['id', 'cashbook_id', 'reference_no', 'transaction_date', 'transaction_type', 'amount', 'balance_after', 'remark', 'created_by'],
+        'cashbook-closings' => ['id', 'cashbook_id', 'closing_date', 'closed_at', 'opening_balance', 'closing_balance', 'remark', 'created_by'],
         'daily-summary' => ['date', 'total_rooms', 'available_rooms', 'occupied_rooms', 'check_ins', 'check_outs', 'room_revenue', 'food_drink_revenue', 'other_bill_revenue', 'total_revenue', 'total_payment_received', 'refunds', 'net_payment_received', 'outstanding_balance'],
         'room-occupancy' => ['booking_id', 'room', 'category', 'guest', 'check_in', 'check_out', 'duration_days', 'status'],
         'room-revenue' => ['booking_id', 'date', 'room', 'guest', 'stay_type', 'room_charge', 'extra_time', 'discount', 'tax', 'service_charge', 'total'],
@@ -21,7 +23,7 @@ class HotelReportExportService
         'depreciation' => ['asset_id', 'asset', 'original_value', 'month', 'monthly_depreciation', 'accumulated', 'book_value'],
     ];
 
-    private const TEXT_COLUMNS = ['date', 'room', 'category', 'guest', 'check_in', 'check_out', 'status', 'stay_type', 'payment_status', 'order_no', 'menu_item', 'item', 'charge_type', 'description', 'unit', 'asset', 'month'];
+    private const TEXT_COLUMNS = ['reference_no', 'transaction_date', 'transaction_type', 'closing_date', 'closed_at', 'remark', 'date', 'room', 'category', 'guest', 'check_in', 'check_out', 'status', 'stay_type', 'payment_status', 'order_no', 'menu_item', 'item', 'charge_type', 'description', 'unit', 'asset', 'month'];
 
     /** @param array{report: string, date_from: string, date_to: string, currency: string, rows: array<int, array<string, mixed>>, summary?: array<string, mixed>, notes?: array<int, string>} $result */
     public function write(array $result): void
